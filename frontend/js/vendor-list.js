@@ -29,7 +29,7 @@ let ReversecategoryDict = {
 
 async function fetchMetadata() {
     try {
-        const response = await fetch("http://35.154.101.129:3000/vendor/api/metadata/");
+        const response = await fetch("http://35.154.101.129:3000/vendor_api/metadata/");
         if (!response.ok) throw new Error("Network response was not ok");
 
         const data = await response.json();
@@ -60,23 +60,19 @@ async function fetchMetadata() {
     }
 }
 
-async function fetchVendorData(filters = {}) {
+async function fetchVendorData(tab_no ,filters = {}) {
     try {
-        const response = await fetch("http://35.154.101.129:3000/vendor/api/", {
+        const response = await fetch("http://35.154.101.129:3000/vendor_api/", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                tab: 43,
+                tab: tab_no,
                 order: "ASC",
-                category: 2,
+                category: 0,
                 locationIds: filters.locationIds || [],
                 jobNatureIds: filters.jobNatureIds || [],
-                user_name: "Sathish Nadar",
-                user_password: "1234",
-                email: "sathish.mac23@gmail.com",
-                phone_no: "9321945896"
             })
         });
 
@@ -88,8 +84,9 @@ async function fetchVendorData(filters = {}) {
         allVendors = data.vendors || [];
         totalVendorCount = data.vendorCount || 0; // Update vendor count after filters
 
-        renderVendorList(1);
-        renderVendorPagination(totalVendorCount, 1);
+        currentVendorPage = tab_no;
+        renderVendorList(tab_no);
+        renderVendorPagination(totalVendorCount, tab_no);
 
     } catch (error) {
         console.error("Error fetching vendor data:", error);
@@ -97,22 +94,39 @@ async function fetchVendorData(filters = {}) {
 }
 
 async function initializeVendorList() {
-    await fetchMetadata();  // ✅ Wait for metadata to load
-    fetchVendorData();  // ✅ Fetch vendors after metadata is ready
+    await fetchMetadata();  
+    fetchVendorData(1);  
 }
-initializeVendorList();  // ✅ Calls both in sequence
+initializeVendorList();  
 
 
 async function renderVendorList(page) {
-    if (allVendors.length === 0) return;
+    console.log("Rendering Vendor List for Page:", page);
 
     const tbody = document.getElementById("vendor-data");
+    if (!allVendors.length) {
+        console.warn("No vendors available to display.");
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align:center; font-weight:bold; color:red;">
+                     No vendors found for the selected filters.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    if (!tbody) {
+        console.error("Vendor table body not found!");
+        return;
+    }
     tbody.innerHTML = "";
 
-    const startIndex = (page - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, allVendors.length);
+    // const startIndex = (page - 1) * itemsPerPage;
+    // const endIndex = Math.min(startIndex + itemsPerPage, allVendors.length);
 
-    for (let i = startIndex; i < endIndex; i++) {
+
+    for (let i = 0; i < 26; i++) {
         const vendor = allVendors[i];
         const row = document.createElement("tr");
 
@@ -122,7 +136,7 @@ async function renderVendorList(page) {
         };
 
         row.innerHTML = `
-            <td>${formatValue(vendor.contact_person)}</td>
+            <td>${formatValue(vendor.name)}</td>
             <td>${formatValue(ReverseJobNatureDict[vendor.job_nature_id])}</td>
             <td>${formatValue(CategoryDict[vendor.category_id])}</td>
             <td>
@@ -145,7 +159,6 @@ async function renderVendorList(page) {
 
         tbody.appendChild(row);
 
-        // ✅ Copy Phone & Email Functionality
         row.querySelectorAll(".copy-text").forEach(copyItem => {
             copyItem.addEventListener("click", () => {
                 navigator.clipboard.writeText(copyItem.dataset.copy)
@@ -154,111 +167,75 @@ async function renderVendorList(page) {
             });
         });
 
-        // ✅ Show Popup on Row Click (Except Copy Clicks)
         row.addEventListener("click", (event) => {
             if (!event.target.classList.contains("copy-text")) {
                 showPopup(vendor);
             }
         });
     }
-
-    renderVendorPagination(totalVendorCount, page);
 }
 
 
-// ✅ Function to Render Pagination Buttons
 function renderVendorPagination(totalVendors, activePage) {
     const totalPages = Math.ceil(totalVendors / itemsPerPage);
     const paginationDiv = document.getElementById("vendor-pagination");
     paginationDiv.innerHTML = "";
 
-    if (totalVendors === 0) {
-        paginationDiv.innerHTML = "<p>No vendors available.</p>";
-        return;
-    }
+    if (totalVendors === 0 || totalPages <= 1) return; 
 
-    if (totalPages <= 1) return; // Hide pagination if only one page
+    const createButton = (page, isActive = false) => {
+        const btn = document.createElement("button");
+        btn.className = "pagination-btn" + (isActive ? " active" : "");
+        btn.innerText = page;
+        btn.onclick = () => {
+            if (currentVendorPage !== page) { 
+                fetchVendorData(page);  
+            }
+        };
+        return btn;
+    };
 
-    // ✅ Previous Button (Disabled on first page)
     const left = document.createElement("button");
     left.className = "pagination-btn";
     left.innerText = "<";
-    left.disabled = activePage === 1; // Disable if on first page
+    left.disabled = activePage === 1;
     left.onclick = () => {
         if (currentVendorPage > 1) {
-            currentVendorPage--;
-            renderVendorList(currentVendorPage);
-            renderVendorPagination(totalVendors, currentVendorPage);
+            fetchVendorData(currentVendorPage - 1);
         }
     };
     paginationDiv.appendChild(left);
 
-    // ✅ First Page (Always show)
-    const firstPage = document.createElement("button");
-    firstPage.className = "pagination-btn" + (activePage === 1 ? " active" : "");
-    firstPage.innerText = "1";
-    firstPage.onclick = () => {
-        currentVendorPage = 1;
-        renderVendorList(1);
-        renderVendorPagination(totalVendors, 1);
-    };
-    paginationDiv.appendChild(firstPage);
+    paginationDiv.appendChild(createButton(1, activePage === 1));
 
-    // ✅ Left Ellipsis if activePage is far from page 1
-    if (activePage > 2) {
-        const leftDots = document.createElement("span");
-        leftDots.innerText = "...";
-        leftDots.style.margin = "0 5px";
-        paginationDiv.appendChild(leftDots);
+    let start = Math.max(2, activePage - 1);
+    let end = Math.min(totalPages - 1, activePage + 1);
+
+    if (start > 2) {
+        paginationDiv.appendChild(document.createTextNode("..."));
     }
 
-    // ✅ Middle Page (Current Page)
-    if (activePage !== 1 && activePage !== totalPages) {
-        const middlePage = document.createElement("button");
-        middlePage.className = "pagination-btn active";
-        middlePage.innerText = activePage;
-        paginationDiv.appendChild(middlePage);
+    for (let i = start; i <= end; i++) {
+        paginationDiv.appendChild(createButton(i, activePage === i));
     }
 
-    // ✅ Right Ellipsis if activePage is far from last page
-    if (activePage < totalPages - 2) {
-        const rightDots = document.createElement("span");
-        rightDots.innerText = "...";
-        rightDots.style.margin = "0 5px";
-        paginationDiv.appendChild(rightDots);
+    if (end < totalPages - 1) {
+        paginationDiv.appendChild(document.createTextNode("..."));
     }
 
-    // ✅ Last Page (Always show)
-    if (totalPages > 1) {
-        const lastPage = document.createElement("button");
-        lastPage.className = "pagination-btn" + (activePage === totalPages ? " active" : "");
-        lastPage.innerText = totalPages;
-        lastPage.onclick = () => {
-            currentVendorPage = totalPages;
-            renderVendorList(totalPages);
-            renderVendorPagination(totalVendors, totalPages);
-        };
-        paginationDiv.appendChild(lastPage);
-    }
+    paginationDiv.appendChild(createButton(totalPages, activePage === totalPages));
 
-    // ✅ Next Button (Disabled on last page)
     const right = document.createElement("button");
     right.className = "pagination-btn";
     right.innerText = ">";
-    right.disabled = activePage === totalPages; // Disable if on last page
+    right.disabled = activePage === totalPages;
     right.onclick = () => {
         if (currentVendorPage < totalPages) {
-            currentVendorPage++;
-            renderVendorList(currentVendorPage);
-            renderVendorPagination(totalVendors, currentVendorPage);
+            fetchVendorData(currentVendorPage + 1);
         }
     };
     paginationDiv.appendChild(right);
 }
-
-
-
-
 
 
 
@@ -276,9 +253,6 @@ function loadFilterData(id) {
 
     populateFilterOptions(id, items, id);
 }
-
-
-
 
 
 
@@ -313,9 +287,19 @@ function populateFilterOptions(containerId, items, type) {
 function applyFilters() {
     let selectedJobs = getSelectedValues("job-options-checkbox"); 
     let selectedLocations = getSelectedValues("location-options-checkbox");
+    let selectedCategory= getSelectedValues("category-options-checkbox");
 
     console.log("Selected Jobs:", selectedJobs);
     console.log("Selected Locations:", selectedLocations);
+    console.log("Selected Categories:", selectedCategory);
+
+    let filters = {
+        locationIds: selectedLocations.map(name => locationDict[name] || null).filter(Boolean),
+        jobNatureIds: selectedJobs.map(name => jobNatureDict[name] || null).filter(Boolean),
+        categories: selectedCategory.map(name => ReversecategoryDict[name] || null).filter(Boolean),
+    };
+    console.log(filters);
+    fetchVendorData(1, filters); 
 }
 
 
@@ -499,7 +483,7 @@ function filterSearch(inputId, listId) {
 
 
 function clearFilters() {
-    document.querySelectorAll(".job-options-checkbox, .location-options-checkbox").forEach(checkbox => {
+    document.querySelectorAll(".job-options-checkbox, .location-options-checkbox, .category-options-checkbox").forEach(checkbox => {
         checkbox.checked = false;
         sessionStorage.removeItem(checkbox.value);
     });

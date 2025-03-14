@@ -1,3 +1,11 @@
+/* @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,200;0,300;0,400;0,500;1,500&display=swap');
+
+*{
+  font-family: "Poppins", sans-serif;
+  font-weight: 500;
+  font-style: normal;
+} */
+
 .vendor-header {
   display: flex;
   justify-content: space-between;
@@ -79,7 +87,7 @@ body.vendor-active .sidebar {
   width: 30vw;
   max-height: 65vh;
   overflow-y: auto;
-  max-width: 90%;
+  width: 480px;
   border-radius: 8px;
   position: fixed;
   top: 50%;
@@ -128,6 +136,7 @@ body.vendor-active .sidebar {
 }
 
 .copy-btn{
+  cursor: pointer;
   position: absolute;
   top: 20px;
   right: 50px;
@@ -256,6 +265,7 @@ body.vendor-active .sidebar {
 
 .filter-overlay.active {
   display: block;
+  overflow-y: auto;
 }
 
 /* Dialog Box */

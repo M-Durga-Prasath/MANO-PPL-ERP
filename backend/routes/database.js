@@ -1,11 +1,14 @@
 import mysql from 'mysql2';
 import dotenv from 'dotenv';
 import Fuse from "fuse.js";
+import path from "path";
+import { fileURLToPath } from "url";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
-const result = dotenv.config({ path: './backend/.env' });
-// const result = dotenv.config({ path: '.env' });
+const result = dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 if (result.error) {
     console.error("Error loading .env file:", result.error);
@@ -175,7 +178,7 @@ export async function r_updateDPR(dprId, updatedData) {
 // ----------> Vendors List
 // Function to fetch vendors with pagination and filtering
 export async function r_fetchVendorsByTab({
-    category = 1,
+    category = 0,
     tab = 1,
     limit = 25,
     locationIds = [],
@@ -185,8 +188,15 @@ export async function r_fetchVendorsByTab({
 
     const offset = (tab - 1) * limit;
     
-    let baseQuery = "FROM Vendors WHERE category_id = ?";
-    const params = [category];
+    let baseQuery = "FROM Vendors";
+    const params = [];
+
+    if (category !== 0) {
+        baseQuery += " WHERE category_id = ?";
+        params.push(category);
+    } else {
+        baseQuery += " WHERE 1";
+    }
     
     if (locationIds.length > 0) {
         baseQuery += ` AND location_id IN (${locationIds.map(() => '?').join(',')})`;
