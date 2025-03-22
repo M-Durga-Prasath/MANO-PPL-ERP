@@ -1,23 +1,27 @@
-async function loginUser() {
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
+async function loginUser(event) {
+  event.preventDefault();
+  const username = document.getElementById("login_username").value;
+  const password = document.getElementById("login_password").value;
 
-  const response = await fetch("http://localhost:3000/auth/login", {
+  const response = await fetch("http://35.154.101.129:3000/auth/login/", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({
+      user_name: username,
+      user_password: password,
+    }),
   });
 
   const data = await response.json();
 
   if (data.message === "Login successful") {
     // Set session with 30 days expiry
-    setSession(data.user.username);
+    setSession(data.user.user_name);
 
     // Redirect to DPR page
-    window.location.href = `frontend\dpr\dpr.html`;
+    window.location.href = `../dahboard/homepage.html`;
   } else {
     alert(data.message);
   }
@@ -46,29 +50,49 @@ function getSession() {
   return username;
 }
 
+async function handleSignup(event) {
+  event.preventDefault();
 
-document.getElementById("signupForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const username = document.getElementById("signupUsername").value;
-  const password = document.getElementById("signupPassword").value;
-  const confirmPassword = document.getElementById("confirmPassword").value;
+  const username = document.getElementById("Username").value;
+  const password = document.getElementById("password").value;
   const email = document.getElementById("email").value;
-  const phno = document.getElementById("phno").value;
+  const phno = document.getElementById("phone_number").value;
 
-  const response = await fetch("http://localhost:3000/auth/signup", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ username, password, confirmPassword, email, phno }),
-  });
+  try {
+    const response = await fetch("http://35.154.101.129:3000/auth/signup/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_name: username,
+        user_password: password,
+        email: email,
+        phone_no: phno,
+      }),
+    });
 
-  const data = await response.json();
-
-  if (response.ok) {
+    const data = await response.json();
     alert(data.message);
-  } else {
-    alert(data.message);
+  } catch (error) {
+    console.error("Signup failed:", error);
+    alert("An error occurred. Please try again.");
   }
+}
+
+
+const form_slider = document.getElementById("form_slider");
+const btn = document.getElementById("btn");
+const header_cont = document.getElementById("header-cont");
+
+btn.addEventListener("click", () => {
+    form_slider.classList.toggle("move");
+
+    if (form_slider.classList.contains("move")) {
+        header_cont.textContent = "USER SIGN IN";
+        btn.textContent = "ALREADY HAVE AN ACCOUNT?";
+    } else {
+        header_cont.textContent = "LOGIN HERE";
+        btn.textContent = "DON'T HAVE AN ACCOUNT?";
+ }
 });
