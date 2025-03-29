@@ -177,9 +177,13 @@ function loadVendorList() {
   const mainContent = document.querySelector(".main-content");
   mainContent.innerHTML = setMainContent("Vendor List");
 
+  setTimeout(() => {
+    attachSearchListeners();
+  }, 200);
+  
   if (!window.vendorScriptLoaded) {
     const script = document.createElement("script");
-    script.src = "../js/vendor-list.js";
+    script.src = "../javaScripts/vendor-list.js";
     script.onload = () => {
       window.vendorScriptLoaded = true;
     };
@@ -199,7 +203,7 @@ function loadConsultantList() {
 
   if (!window.vendorScriptLoaded) {
     const script = document.createElement("script");
-    script.src = "../js/vendor-list.js";
+    script.src = "../javaScripts/vendor-list.js";
     script.onload = () => {
       window.vendorScriptLoaded = true;
     };
@@ -217,7 +221,7 @@ function loadContractorList() {
 
   if (!window.vendorScriptLoaded) {
     const script = document.createElement("script");
-    script.src = "../js/vendor-list.js";
+    script.src = "../javaScripts/vendor-list.js";
     script.onload = () => {
       window.vendorScriptLoaded = true;
     };
@@ -238,7 +242,7 @@ function loadSupplierList() {
 
   if (!window.vendorScriptLoaded) {
     const script = document.createElement("script");
-    script.src = "../js/vendor-list.js";
+    script.src = "../javaScripts/vendor-list.js";
     script.onload = () => {
       window.vendorScriptLoaded = true;
     };
@@ -248,4 +252,8 @@ function loadSupplierList() {
     initializeVendorList();
     attachSearchListeners();
   }
+}
+
+function userdropdown(){
+  
 }

@@ -125,6 +125,7 @@ async function search(tab_no, searchtext) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+
         },
         body: JSON.stringify({
           queryString: `${searchtext}`,
@@ -522,7 +523,7 @@ function openFilterDialog() {
   }
 
   overlay.classList.add("active");
-  existingDialog.classList.add("active");
+  existingDialog.classList.add("active");          
 }
 
 function copyToClipboard() {
@@ -624,6 +625,7 @@ function filterSearch(inputId, listId) {
 
 function clearFilters() {
   document.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
+    console.log(checkbox)
     checkbox.checked = false;
     sessionStorage.removeItem(checkbox.value);
   });
@@ -661,6 +663,7 @@ function handleSearch() {
 }
 
 function attachSearchListeners() {
+  console.log("yo");  
   const searchInput = document.querySelector(".search-field .input");
   const searchButton = document.querySelector(".search-box-icon");
 
