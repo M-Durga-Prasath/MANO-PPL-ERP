@@ -22,33 +22,40 @@ if (tableData) {
 //-------------------------FOR TODAY TABLE ---------------------------------//
 console.log("YEAH even i can't believe i made it!!!")
 
+//-------------------------FOR TODAY TABLE ---------------------------------//
 if (todaytableData) {
-todaytableData.forEach(todayrow => {
+    todaytableData.forEach(todayrow => {
         const tr = document.createElement('tr');
         todayrow.forEach(cell => {
             const td = document.createElement('td');
             td.textContent = cell;
+            // Add empty cell styling if content is empty
+            if (cell === "") {
+                td.style.minHeight = "20px"; // Set minimum height for empty cells
+                td.style.border = "1px solid #ddd"; // Ensure borders are visible
+            }
             tr.appendChild(td);
         });
         todaydisplayTable.appendChild(tr);
     });
-} else {
-    
 }
 
-
+//-------------------------FOR TOMORROW TABLE ------------------------------//
 if (tomorrowtableData) {
     tomorrowtableData.forEach(tomorrowrow => {
         const tr = document.createElement('tr');
         tomorrowrow.forEach(cell => {
             const td = document.createElement('td');
             td.textContent = cell;
+            // Add empty cell styling if content is empty
+            if (cell === "") {
+                td.style.minHeight = "20px"; // Match height with today-table
+                td.style.border = "1px solid #ddd"; // Ensure borders are visible
+            }
             tr.appendChild(td);
         });
         tomorrowdisplayTable.appendChild(tr);
     });
-} else {
-    
 }
 
 function printit(){
@@ -72,3 +79,30 @@ document.getElementById("slushy-day-checkbox").style.backgroundColor = "green";
 if (parsedItem[1] =="dry"){
 document.getElementById("dry-day-checkbox").style.backgroundColor = "green";
 }
+
+//--------------------------------------FOR DISPLAYING TIME TABLE-------------------------//
+// Fetch stored time slots from sessionStorage
+document.addEventListener("DOMContentLoaded", function () {
+    const timeSlots = JSON.parse(sessionStorage.getItem("timeslots")) || [];
+    const table = document.querySelector(".from-to");
+
+    if (table) {
+        // Clear existing rows (if any)
+        table.innerHTML = "";
+
+        // Dynamically create and insert rows for each time slot
+        timeSlots.forEach(slot => {
+            const row = document.createElement("tr");
+
+            const fromTd = document.createElement("td");
+            fromTd.innerHTML = `From: <span>${slot.from}</span>`;
+
+            const toTd = document.createElement("td");
+            toTd.innerHTML = `To: <span>${slot.to}</span>`;
+
+            row.appendChild(fromTd);
+            row.appendChild(toTd);
+            table.appendChild(row);
+        });
+    }
+});
