@@ -33,20 +33,24 @@
                 <table class="first-table">
                         <tbody>
                           <tr>
-                            <td>Name of Work:</td>
+                            <td>Project Name</td>
                             <td style="width: fit-content;text-align: center;">Sati Darshan, Malad</td>
                           </tr>
                           <tr>
-                            <td>Project Start Date:</td>
+                            <td>Start Date:</td>
                             <td style="width: fit-content;text-align: center;" id="startdate">02-05-2022</td>
                           </tr>
                           <tr>
+                          <tr>
+                            <td>End Date:</td>
+                            <td style="width: fit-content;text-align: center;" id="enddate">16-05-2025</td>
+                          </tr>
                             <td>Employer:</td>
                             <td style="width: fit-content;text-align: center;">M/s Goyal Sati Darshan LLP</td>
                           </tr>
-                          <tr>
-                            <td>Project Completion Date:</td>
-                            <td style="width: fit-content;text-align: center;" id="enddate">16-05-2025</td>
+                            <tr>
+                            <td>Project Description</td>
+                            <td style="width: fit-content;text-align: center;" id="TotalDays"></td>
                           </tr>
                           <tr>
                             <td>Contract No.:</td>
@@ -55,10 +59,6 @@
                           <tr>
                             <td>Location:</td>
                             <td style="width: fit-content;text-align: center;" >Malad(W), Mumbai</td>
-                          </tr>
-                          <tr>
-                            <td>Duration in Days:</td>
-                            <td style="width: fit-content;text-align: center;" id="TotalDays"></td>
                           </tr>
                           <tr>
                             <td id="elapsedDays"></td>
@@ -96,9 +96,12 @@
                             <p>Sunny</p>
                           </div>
                         </td>
-                        <td style="text-align: center; " rowspan="2">
-                          <button id="pop-up" class="timeslot-button">ADD TIME SLOTS</button>
-                        </td>
+                        <td style="text-align: center;" rowspan="2">
+  <button id="pop-up" class="timeslot-button">
+    <span id="timeslot-count">0</span> TIME SLOTS
+  </button>
+  <div id="timeslots-display" class="timeslots-display"></div>
+</td>
                       </tr>
                       <tr>
                         <td>
@@ -154,8 +157,7 @@
                 <div class="action-buttons">
                     <button class="labourtable-button" onclick="addRow()">Add Row</button>
                     <button class="labourtable-button" onclick="deleteRow()">Delete Row</button>
-                    <button class="labourtable-button" onclick="resetData()">Reset</button>
-                    <button class="labourtable-button" onclick="calculateTotals()">TOTAL</button>
+                    <button class="labourtable-button" onclick="clearTableKeepRows()">Reset</button>
                   </div>
                   <br>
                   <table id="labourTable">
@@ -245,8 +247,8 @@
                             <h1>TOMORROW'S PLANNING</h1>
                         </div>
                         <div class="planning-add-row">
-                          <button class="tomo-add-row-btn">hello</button>
-                          <button class="remove-row-btn">hello</button>
+                          <button class="tomo-add-row-btn">ADD ROW</button>
+                          <button class="remove-row-btn">REMOVE ROW</button>
                         </div>
                         <table id="tomorrow-table">
                             <thead>
@@ -271,6 +273,32 @@
                     </div>
                     </div>
                 </div>
+                <div class="remarks-events-input-container">
+  <div class="table-header fixed-header">
+    <h1>Events/Remarks</h1>
+  </div>
+  
+  <!-- Added controls and container -->
+  <div class="input-controls">
+    <button class="labourtable-button" id="addInputBtn">Add Input</button>
+    <button class="labourtable-button" id="removeInputBtn" disabled>Remove Last</button>
+  </div>
+  
+  <div id="dynamicInputsContainer">
+    <!-- Dynamic inputs will appear here -->
+  </div>
+  <div class="table-header fixed-header">
+  <h1>Remarks</h1>
+</div>
+
+<div class="input-controls">
+  <button class="labourtable-button" id="addRemarkBtn">Add Input</button>
+  <button class="labourtable-button" id="removeRemarkBtn" disabled>Remove Last</button>
+</div>
+
+<div class="dynamicInputsContainer" id="remarksContainer">
+  <!-- Initial 3 inputs will be added by JavaScript -->
+</div>
                 <br>
                 <div class="submit-section">
                   <button class="generate-dpr-btn" onclick="displaydata()">GENERATE DPR</button>

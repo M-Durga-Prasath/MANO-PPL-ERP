@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DPR-PDF</title>
     <link rel="stylesheet" href="dpr-pdf.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
 </head>
 <body>
         <div class="dpr-pdf-container">
@@ -19,24 +22,24 @@
             <div class="project-left">
                 <div class="project-label">Pro</div>
                 <table class="project-table">
-                    <tr><td>NAME OF WORK</td><td>Dynamic</td></tr>
-                    <tr><td>EMPLOYER</td><td>Dynamic</td></tr>
-                    <tr><td>CONTACT NO</td><td>Dynamic</td></tr>
-                    <tr><td>LOCATION</td><td>Dynamic</td></tr>
+                    <tr><td style="padding-left: 5px;">NAME OF WORK</td><td style="padding-left: 5px; border-right: 0px;">Dynamic</td></tr>
+                    <tr><td style="padding-left: 5px;">EMPLOYER</td><td style="padding-left: 5px;">Dynamic</td></tr>
+                    <tr><td style="padding-left: 5px;">CONTACT NO</td><td style="padding-left: 5px;">Dynamic</td></tr>
+                    <tr><td style="padding-left: 5px;">LOCATION</td><td style="padding-left: 5px;">Dynamic</td></tr>
                 </table>
-                <table style="width: 25%;">
-                    <tr><td>PROJECT START DATE</td><td>Dynamic</td></tr>
-                    <tr><td>PROJECT COMPLETION</td><td>Dynamic</td></tr>
+                <table style="width: 25%; border-right: 0px; border-left: 0px;">
+                    <tr><td style="padding-left: 5px; border: 0px;">PROJECT START DATE</td><td style="padding-left: 5px; border-right: 0px;">Dynamic</td></tr>
+                    <tr><td style="padding-left: 5px;">PROJECT COMPLETION</td><td style="padding-left: 5px;">Dynamic</td></tr>
                 </table>
             </div>
             <div class="project-bottom">
-                <div class="durr" style="width: 15%;">Dur. in Days</div>
-                <div class="total" style="width: 10%;">Total</div>
-                <div class="total-value" style="width: 15%;">Dy</div>
-                <div class="blank" style="width: 30%;"></div>
-                <div class="balance-left" style="width: 10%;">Dy</div>
-                <div class="balance" style="width: 10%;">Balance</div>
-                <div class="balance-right" style="width: 10%;">Dyn</div>
+                <div class="durr" style="width: 15%; padding-left: 5px; border-bottom: 0px;">Dur. in Days</div>
+                <div class="total" style="width: 10%; padding-left: 5px; border-bottom: 0px;">Total</div>
+                <div class="total-value" style="width: 15%; padding-left: 5px;">Dy</div>
+                <div class="blank" style="width: 30%; padding-left: 5px;"></div>
+                <div class="balance-left" style="width: 10%; padding-left: 5px;">Dy</div>
+                <div class="balance" style="width: 10%; padding-left: 5px;">Balance</div>
+                <div class="balance-right" style="width: 10%; padding-left: 5px;">Dyn</div>
             </div>
             <div class="site">
                 <div class="site-label">Site</div>
@@ -77,7 +80,7 @@
                 </table>
                 <table class="bottom-of-labour-table">
                     <tr>
-                        <td style="text-align: left;">commulative man power upto last date</td>
+                        <td class="commulative" style="text-align: left;">commulative man power upto last date</td>
                         <td style="text-align: center;">2</td>
                         <td style="text-align: center;">3</td>
                         <td style="text-align: center;">4</td>
@@ -86,28 +89,61 @@
                 </table>
             </div>
         </div>
-            <div style="width: 100%; display: flex; flex-direction: row;" class="today-tomorrow-table-container">
-                <table style="width: 50%;" id="today-table">
+            <div style="width: 100%; display: flex; flex-direction: row; border-top: 0px; border-left: 0px; border-right: 0px;" class="today-tomorrow-table-container">
+                <table id="today-table">
                     <tbody>
-                        <tr><th style="text-align: center;">TODAY'S PROGRESS</th></tr>
-                        <tr><td>Task</td>
-                            <td>Quantity</td>
+                        <tr><th class="today-planning-header" style="text-align: center;">TODAY'S PROGRESS</th></tr>
+                        <tr><th style="text-align: center;">Task</th>
+                            <th>Quantity</th>
                         </tr>
                     </tbody>
                 </table>
-                <table style="width: 50%;" id="tomorrow-table">
-                    <tbody>
-                        <tr><th style="text-align: center;">TOMORROW'S PLANNING</th></tr>
-                        <tr><th>Task</th>
+                <table id="tomorrow-table">
+                    <tbody style="border-left: none; border-right: none;">
+                        <tr><th class="tomorrow-planning-header" style="text-align: center; ">TOMORROW'S PLANNING</th></tr>
+                        <tr><th style="text-align: center;">Task</th>
                             <th>Quantity</th>
                         </tr>
                     </tbody>
                 </table>
             </div>
-            
+            <div class="additional-remarks-container">
+                <div style="border-right: 0px; border-top: 0px; border-bottom: 0px; border-left: 0px;" class="events-remarks">
+                    <div style="border-left: 0px; border-right: 0px;" class="events-label">
+                        EVENTS/REMARKS
+                    </div>
+                    <div class="events-container" id="events-container">
+                    <div class="events-content">--</div>
+                    <div class="events-content">--</div>
+                    <div class="events-content">--</div>
+                    <div class="events-content">--</div>
+                    <div class="events-content">--</div>
+                    <div class="events-content">--</div>
+                    </div>
+                </div>
+                <div style="border-left: 0px; border-right: 0px;" class="remarks">
+                    <div style="border-left: 0px; border-right: 0px;" class="remarks-label">
+                        REMARKS
+                    </div>
+                    <div class="remarks-content-container">
+                    <div class="remarks-content">--</div>
+                    <div class="remarks-content">--</div>
+                    <div class="remarks-content">--</div>
+                    </div>
+                    <div id="distribution" class="distribution">
+                        GOYAL
+                    </div>
+                    <div id="prepared-by" class="prepared-by">
+                        MANO PCPL
+                    </div>
+                    <div class="signature">
+                        MANO
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="button-container">
-            <button id="download-pdf" onclick="printit()">SEE PDF PREVIEW</button>
+            <button id="download-pdf">SEE PDF PREVIEW</button>
             <button onclick="window.history.back()">MAKE CHANGES</button>
         </div>
     <script src="dpr-pdf.js"></script>

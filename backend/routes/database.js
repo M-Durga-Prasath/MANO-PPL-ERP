@@ -22,11 +22,25 @@ const pool = mysql.createPool({
     database: process.env.MYSQL_DATABASE,
 }).promise();
 
-// ----------------------- USER FUNCTIONS ----------------------- //
+
+// ----------------------- HELPING FUNCTIONS ----------------------- //
+
+function safeParse(jsonField) {
+    if (!jsonField) return {};
+    if (typeof jsonField === "object") return jsonField;
+    try {
+        return JSON.parse(jsonField);
+    } catch (err) {
+        console.error("❌ Failed to parse JSON field:", jsonField);
+        return {};
+    }
+}
+
+// ----------------------------- USER ----------------------------- //
 
 // Function to fetch User by ID
 export async function r_fetchUserByID(user_id) {
-    const query = "SELECT * FROM Users WHERE user_id = ?";
+    const query = "SELECT * FROM users WHERE user_id = ?";
     try {
         const [row] = await pool.query(query, [user_id]);
         return row[0] || null;
@@ -39,7 +53,7 @@ export async function r_fetchUserByID(user_id) {
 // Function to fetch Multiple Users by ID
 export async function r_fetchUsersByID(user_ids) {
     const placeHolder = user_ids.map(() => "?").join(', ');
-    const query = `SELECT * FROM Users WHERE user_id IN (${placeHolder})`;
+    const query = `SELECT * FROM users WHERE user_id IN (${placeHolder})`;
 
     try {
         const [rows] = await pool.query(query, user_ids);
@@ -52,7 +66,7 @@ export async function r_fetchUsersByID(user_ids) {
 
 // Function to fetch user_name by ID
 export async function r_fetchUserNameByID(user_id) {
-    const query = "SELECT user_name FROM Users WHERE user_id = ?";
+    const query = "SELECT user_name FROM users WHERE user_id = ?";
     try {
         const [row] = await pool.query(query, [user_id]);
         return row[0].user_name || null;
@@ -64,7 +78,7 @@ export async function r_fetchUserNameByID(user_id) {
 
 // Function to fetch User by user_name
 export async function r_fetchUserByName(name) {
-    const query = "SELECT * FROM Users WHERE user_name = ?"
+    const query = "SELECT * FROM users WHERE user_name = ?"
     try {
         const [row] = await pool.query(query, [name]);
         return row[0] || null;
@@ -76,7 +90,7 @@ export async function r_fetchUserByName(name) {
 
 // Function to add user
 export async function r_addUser(user_data) {
-    const query = "INSERT INTO Users (user_name, user_password, email, phone_no) VALUES (?, ?, ?, ?);";
+    const query = "INSERT INTO users (user_name, user_password, email, phone_no) VALUES (?, ?, ?, ?);";
     
     try {
         const [result] = await pool.query(query, user_data);
@@ -89,7 +103,7 @@ export async function r_addUser(user_data) {
 
 // Function to check user_name exists
 export async function r_usernameExist(user_name) {
-    const query = "SELECT user_id FROM Users WHERE user_name = ?";
+    const query = "SELECT user_id FROM users WHERE user_name = ?";
     try {
         const [rows] = await pool.query(query, user_name);
         return rows[0]
@@ -101,7 +115,7 @@ export async function r_usernameExist(user_name) {
 
 // Function to check Email or PhoneNo. is Taken
 export async function r_isEmailOrPhoneTaken(email, phone) {
-    const query = "SELECT COUNT(*) AS count FROM Users WHERE email = ? OR phone_no = ?";
+    const query = "SELECT COUNT(*) AS count FROM users WHERE email = ? OR phone_no = ?";
     
     try {
         const [rows] = await pool.query(query, [email, phone]);
@@ -112,60 +126,238 @@ export async function r_isEmailOrPhoneTaken(email, phone) {
     }
 }
 
-// ------------------------ DPR FUNCTIONS ------------------------- //
+// ---------------------- PROJECT ----------------------- //
+
+// Function to fetch Project by ID
+export async function r_getProjectById(project_id) {
+    if (!project_id) throw new Error("Project ID is required");
+
+    const query = `SELECT * FROM projects WHERE project_id = ?`;
+
+    try {
+        const [rows] = await pool.query(query, [project_id]);
+        if (rows.length === 0) return null;
+
+        const row = rows[0];
+        return {
+            ...row,
+            user_roles: typeof row.user_roles === "string" ? JSON.parse(row.user_roles) : row.user_roles
+        };
+    } catch (error) {
+        console.error("❌ Error fetching project by ID:", error.message);
+        throw error;
+    }
+}
+
+// Function to insert Project
+export async function r_insertProject(data) {
+    const {
+        project_name,
+        project_description = null,
+        start_date = null,
+        end_date = null,
+        location = null,
+        contract_no = null,
+        Employer = null,
+        user_roles = {}
+    } = data;
+
+    if (!project_name) {
+        throw new Error("Missing required fields: project_name");
+    }
+
+    const query = `
+        INSERT INTO projects (
+            user_roles, project_name, project_description,
+            start_date, end_date, location,
+            contract_no, Employer
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    `;
+
+    const values = [
+        JSON.stringify(user_roles),
+        project_name,
+        project_description,
+        start_date,
+        end_date,
+        location,
+        contract_no,
+        Employer
+    ];
+
+    try {
+        const [result] = await pool.query(query, values);
+        return result.insertId;
+    } catch (error) {
+        console.error("❌ Error inserting project:", error.message);
+        throw error;
+    }
+}
+
+// Function to update Project
+export async function r_updateProject(data) {
+    const {
+        project_id,
+        user_roles = {},
+        project_name,
+        project_description = null,
+        start_date = null,
+        end_date = null,
+        location = null,
+        contract_no = null,
+        Employer = null
+    } = data;
+
+    if (!project_id || !project_name) {
+        throw new Error("Missing required fields: project_id or project_name");
+    }
+
+    const query = `
+        UPDATE projects
+        SET 
+            user_roles = ?,
+            project_name = ?,
+            project_description = ?,
+            start_date = ?,
+            end_date = ?,
+            location = ?,
+            contract_no = ?,
+            Employer = ?
+        WHERE project_id = ?;
+    `;
+
+    const values = [
+        JSON.stringify(user_roles),
+        project_name,
+        project_description,
+        start_date,
+        end_date,
+        location,
+        contract_no,
+        Employer,
+        project_id
+    ];
+
+    try {
+        const [result] = await pool.query(query, values);
+        return result.affectedRows;
+    } catch (error) {
+        console.error("❌ Error updating project:", error.message);
+        throw error;
+    }
+}
+
+
+// ------------------------ DPR ------------------------- //
+
+const dprFormat = {
+    project_id: null,
+    report_date: "",
+
+    site_condition: {
+        ground_state: "",         // e.g., "dry", "slushy"
+        is_rainy: false,          // true/false
+        rain_timing: []           // e.g., ["10:10-11:00", "01:05-02:00"]
+    },
+
+    labour_report: {
+        agency: [],               // List of agency names
+        mason: [],                // Count per agency
+        carp: [],
+        fitter: [],
+        electrical: [],
+        painter: [],
+        gypsum: [],
+        plumber: [],
+        helper: [],
+        staff: [],
+        remarks: ""               // Any remarks
+    },
+
+    cumulative_manpower: null,   // Total manpower count (including today)
+
+    today_prog: {
+        progress: [],             // e.g., ["cement imported.", "water distributed."]
+        qty: []                   // e.g., ["1kg", "5L"]
+    },
+
+    tomorrow_plan: {
+        plan: [],                 // e.g., ["cement imported.", "water distributed."]
+        qty: []                   // e.g., ["1kg", "5L"]
+    },
+
+    user_roles: {
+        created_by: null,
+        approvals: {},            // e.g., { "1": true, "3": false }
+        viewers: [],              // user IDs
+        editors: []               // user IDs
+    },
+
+    report_footer: {
+        events_visit: [],         // e.g., [{ time: "10:00", note: "VIP visit" }] or just []
+        distribute: [],           // e.g., ["L&T", "MAPLANI"]
+        prepared_by: ""           // Name of preparer
+    },
+
+    created_at: ""               // e.g., "2025-01-19 12:00:00"
+};
+
 
 // Function to fetch DPR by ID
-export async function r_fetchDprByID(id) {
-    const query = "SELECT * FROM DPR WHERE dpr_id = ?";
+export async function r_getDPRById(dpr_id) {
+    if (!dpr_id) {
+        throw new Error("DPR ID is required");
+    }
+
+    const query = `SELECT * FROM dpr WHERE dpr_id = ?`;
+
     try {
-        const [row] = await pool.query(query, [id]);
-        return row[0] || null;
+        const [rows] = await pool.query(query, [dpr_id]);
+        if (rows.length === 0) return null;
+
+        const row = rows[0];
+
+        return {
+            ...row,
+            site_condition: safeParse(row.site_condition),
+            labour_report: safeParse(row.labour_report),
+            today_prog: safeParse(row.today_prog),
+            tomorrow_plan: safeParse(row.tomorrow_plan),
+            user_roles: safeParse(row.user_roles),
+            report_footer: safeParse(row.report_footer)
+        };
     } catch (error) {
-        console.error("❌ Error fetching DPR by ID:", error);
+        console.error("❌ Error fetching DPR by ID:", error.message);
         throw error;
     }
 }
 
 // Function to Insert DPR
 export async function r_insertDPR(dprData) {
-    if (!dprData.project_id || !dprData.reported_by || !dprData.report_date) {
-        throw new Error("Missing required fields: project_id, reported_by, or report_date");
+    if (!dprData.project_id || !dprData.report_date) {
+        throw new Error("Missing required fields: project_id or report_date");
     }
 
     const query = `
-    INSERT INTO DPR (
-        project_id, reported_by, report_date, site_condition, agency, mason,
-        carp, fitter, electrical, painter, gypsum, plumber, helper, staff,
-        remarks, cumulative_manpower, today_prog, tomorrow_plan,
-        events_visit, distribute, prepared_by, approval
+    INSERT INTO dpr (
+        project_id, report_date, site_condition, labour_report,
+        cumulative_manpower, today_prog, tomorrow_plan,
+        user_roles, report_footer, created_at
     ) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     `;
-
 
     const values = [
         dprData.project_id,
-        dprData.reported_by,
         dprData.report_date,
-        dprData.site_condition || null,
-        dprData.agency || null,
-        dprData.mason || null,
-        dprData.carp || null,
-        dprData.fitter || null,
-        dprData.electrical || null,
-        dprData.painter || null,
-        dprData.gypsum || null,
-        dprData.plumber || null,
-        dprData.helper || null,
-        dprData.staff || null,
-        dprData.remarks || null,
+        dprData.site_condition ? JSON.stringify(dprData.site_condition) : null,
+        dprData.labour_report ? JSON.stringify(dprData.labour_report) : null,
         dprData.cumulative_manpower ?? 0,
-        dprData.today_prog || null,
-        dprData.tomorrow_plan || null,
-        dprData.events_visit || null,
-        dprData.distribute || null,
-        dprData.prepared_by || null,
-        dprData.approval ? JSON.stringify(dprData.approval) : null
+        dprData.today_prog ? JSON.stringify(dprData.today_prog) : null,
+        dprData.tomorrow_plan ? JSON.stringify(dprData.tomorrow_plan) : null,
+        dprData.user_roles ? JSON.stringify(dprData.user_roles) : null,
+        dprData.report_footer ? JSON.stringify(dprData.report_footer) : null,
+        dprData.created_at ?? new Date()
     ];
 
     try {
@@ -179,131 +371,81 @@ export async function r_insertDPR(dprData) {
 
 // Function to Update DPR
 export async function r_updateDPR(dprData) {
-    if (!dprData.project_id || !dprData.reported_by || !dprData.report_date) {
-        throw new Error("Missing required fields: project_id, reported_by, or report_date");
+    if (!dprData.dpr_id || !dprData.project_id || !dprData.report_date) {
+        throw new Error("Missing required fields: dpr_id, project_id, or report_date");
     }
 
     const query = `
-    UPDATE DPR
+    UPDATE dpr
     SET
         project_id = ?,
-        reported_by = ?,
         report_date = ?,
         site_condition = ?,
-        agency = ?,
-        mason = ?,
-        carp = ?,
-        fitter = ?,
-        electrical = ?,
-        painter = ?,
-        gypsum = ?,
-        plumber = ?,
-        helper = ?,
-        staff = ?,
-        remarks = ?,
+        labour_report = ?,
         cumulative_manpower = ?,
         today_prog = ?,
         tomorrow_plan = ?,
-        events_visit = ?,
-        distribute = ?,
-        prepared_by = ?, 
-        approval = ?
+        user_roles = ?,
+        report_footer = ?,
+        created_at = ?
     WHERE
         dpr_id = ?;
-`;
-
-
+    `;
 
     const values = [
         dprData.project_id,
-        dprData.reported_by,
         dprData.report_date,
-        dprData.site_condition || null,
-        dprData.agency || null,
-        dprData.mason || null,
-        dprData.carp || null,
-        dprData.fitter || null,
-        dprData.electrical || null,
-        dprData.painter || null,
-        dprData.gypsum || null,
-        dprData.plumber || null,
-        dprData.helper || null,
-        dprData.staff || null,
-        dprData.remarks || null,
+        dprData.site_condition ? JSON.stringify(dprData.site_condition) : null,
+        dprData.labour_report ? JSON.stringify(dprData.labour_report) : null,
         dprData.cumulative_manpower ?? 0,
-        dprData.today_prog || null,
-        dprData.tomorrow_plan || null,
-        dprData.events_visit || null,
-        dprData.distribute || null,
-        dprData.prepared_by || null,
-        dprData.approval || null,
+        dprData.today_prog ? JSON.stringify(dprData.today_prog) : null,
+        dprData.tomorrow_plan ? JSON.stringify(dprData.tomorrow_plan) : null,
+        dprData.user_roles ? JSON.stringify(dprData.user_roles) : null,
+        dprData.report_footer ? JSON.stringify(dprData.report_footer) : null,
+        dprData.created_at || new Date().toISOString().slice(0, 19).replace("T", " "),
         dprData.dpr_id
     ];
 
     try {
         const [result] = await pool.query(query, values);
-        return result.insertId;
+        return result.affectedRows;
     } catch (error) {
-        console.error("❌ Error inserting DPR:", error.message, "\nData:", dprData);
+        console.error("❌ Error updating DPR:", error.message, "\nData:", dprData);
+        throw error;
+    }
+}
+
+// Function to fetch last DPR cummulative manpower
+export async function r_fetchLastManPower(project_id) {
+    const query = "SELECT cumulative_manpower FROM DPR WHERE project_id = ? ORDER BY report_date DESC LIMIT 1;";
+    try {
+        const [data] = await pool.query(query, [project_id]);
+        return data.length > 0 ? data[0].cumulative_manpower : 0;
+    } catch (error) {
+        console.error("❌ Error fetching last DPR cumulative manpower:", error);
         throw error;
     }
 }
 
 // Function to structure raw DPR into formatted object
-export async function FormatDprData(dpr_data) {
-    try {
-        const structuredDpr = { ...dpr_data };
+export async function DprInit(project_id, report_by) {
 
-        // Parse site_condition to array
-        if (structuredDpr.site_condition) {
-            structuredDpr.site_condition = structuredDpr.site_condition.split("|");
-            if (structuredDpr.site_condition[1] === "rainy" && structuredDpr.site_condition[2]) {
-                structuredDpr.site_condition[2] = structuredDpr.site_condition[2].split(',');
-            }
-        }
+    const project_data = r_fetchProjectByID(project_id);
+    let dpr = dprFormat;
 
-        // agency and distribute as arrays
-        if (structuredDpr.agency) {
-            structuredDpr.agency = structuredDpr.agency.split(",");
-        }
-        if (structuredDpr.distribute) {
-            structuredDpr.distribute = structuredDpr.distribute.split(",");
-        }
+    dpr.project_id = project_id;
+    dpr.reported_by = report_by;
+    dpr.report_date = new Date().toISOString().split("T")[0];
+    dpr.cumulative_manpower = await r_fetchLastManPower(project_id);
+    dpr.labour_report.agency = project_data.agency.split(",");
+    dpr.project_name = project_data.project_name;
+    dpr.employer = project_data.employer;
 
-        // Split comma-separated integer arrays
-        const comma_sep_int = ["mason", "carp", "fitter", "electrical", "painter", "gypsum", "plumber", "helper", "staff", "approval"];
-        comma_sep_int.forEach((agent) => {
-            if (structuredDpr[agent]) {
-                structuredDpr[agent] = structuredDpr[agent].split(",").map(num => {
-                    const parsed = parseInt(num, 10);
-                    return isNaN(parsed) ? null : parsed;
-                });
-            }
-        });
-
-        // Split progress/plans to [task, quantity] arrays
-        ["today_prog", "tomorrow_plan"].forEach((item) => {
-            if (structuredDpr[item]) {
-                structuredDpr[item] = structuredDpr[item].split("|").map(x => x.split("~"));
-            }
-        });
-
-        structuredDpr.reported_by = await r_fetchUserNameByID(structuredDpr.reported_by);
-
-        structuredDpr.approval = await Promise.all(
-            structuredDpr.approval.map(user_id => r_fetchUserNameByID(user_id))
-        );
-
-        return structuredDpr;
-
-    } catch (error) {
-        console.error("❌ Error formatting DPR:", error.message);
-        throw error;
-    }
+    return dpr;   
 }
 
 
-// ----------------------- VENDOR FUNCTIONS ----------------------- //
+// ----------------------- VENDOR ----------------------- //
 
 // Function to fetch vendors with pagination and filtering
 export async function r_fetchVendorsByTab({
@@ -317,7 +459,7 @@ export async function r_fetchVendorsByTab({
 
     const offset = (tab - 1) * limit;
     
-    let baseQuery = "FROM Vendors";
+    let baseQuery = "FROM vendors";
     const params = [];
 
     if (category !== 0) {
@@ -370,7 +512,7 @@ export async function r_fetchIdNamePairs(tableName) {
 
 // Function to fetch Count of vendors in table
 export async function r_fetchVendorsCount() {
-    const query = "SELECT COUNT(*) AS count FROM Vendors";
+    const query = "SELECT COUNT(*) AS count FROM vendors";
     try {
         const [[result]] = await pool.query(query);
         return result.count;
@@ -426,10 +568,7 @@ export async function r_searchVendors({
 
     const vendorCount = results.length;
     const offset = (tab - 1) * limit;
-    results.forEach((vendor) => {console.log(vendor.id)})
     results = results.slice(offset, offset + limit)
-    console.log(offset, limit)
-    results.forEach((vendor) => {console.log(vendor.id)})
     return {
         vendors: results,
         vendorCount,
@@ -437,44 +576,45 @@ export async function r_searchVendors({
 }
 
 
+const dprData = {
+    project_id: 1,
+    reported_by: 5,
+    report_date: "2024-03-18",
+    site_condition: {
+        ground_state: "slushy",
+        weather_state: "rainy", 
+        timing: ["11:00-12:00", "13:00-14:25"]
+    },
+    labour_report: {
+        agency: ["MAPLANI", "L&T", "AMAZON", "NVIDIA"],
+        mason: [0, 0, 1, 0],
+        carp: [1, 0, 3, 5],
+        fitter: [2, 1, 0, 4],
+        electrical: [0, 2, 1, 3],
+        painter: [1, 1, 0, 0],
+        gypsum: [3, 0, 2, 1],
+        plumber: [0, 0, 0, 2],
+        helper: [5, 2, 3, 1],
+        staff: [2, 1, 1, 0],
+        remarks: "Nices remark"
+    },
+    cumulative_manpower: 20,
+    today_prog: [{ "task": "Task one done", "qty": "1Kg" }, { "task": "Task two done", "qty": "7Kg" }, { "task": "Task three done", "qty": "1L" }],
+    tomorrow_plan: [{ "task": "Task seven done", "qty": "1Kg" }, { "task": "Task eight done", "qty": "7Kg" }, { "task": "Task nine done", "qty": "1L" }],
+    events_visit: "Safety audit scheduled",
+    distribute: "Material to be distributed",
+    prepared_by: "Site Manager",
+    approval: {
+        "Mano Bharathi": true,
+        "Rajesh": true,
+        "Sathish Nadar": false
+    }
+};
 
 
 
+// const t = await r_fetchUserByID(2)
+// console.log(t)
 
-
-
-
-// const dprData = {
-//     project_id: 1,
-//     reported_by: 5,
-//     report_date: "2024-03-18",
-//     site_condition: "normal",
-//     agency: "XYZ Constructions",
-//     mason: "John, Alex",
-//     carp: "David, Robert",
-//     fitter: "Mike, Steve",
-//     electrical: "Electric Corp",
-//     painter: "PainterX",
-//     gypsum: "GypsumPro",
-//     plumber: "PlumbIt",
-//     helper: "Helper1, Helper2",
-//     staff: "StaffA, StaffB",
-//     remarks: "Site inspected, materials arrived",
-//     cumulative_manpower: 20,
-//     today_prog: "Foundation work completed",
-//     tomorrow_plan: "Start brickwork",
-//     events_visit: "Safety audit scheduled",
-//     distribute: "Material to be distributed",
-//     prepared_by: "Site Manager",
-//     approval: "12, 15, 18"
-// };
-
-// console.log(dprData);
-
-
-// const nice = await r_fetchDprByID(1);
-// console.log(nice)
-// const bike = await FormatDprData(nice);
-// console.log(bike)
 
 // pool.end()
