@@ -8,23 +8,25 @@ const router = express.Router();
 router.post("/", async (req, res) => {
     try {
         const {
+            queryString = "",
             tab = 1,
             limit = 25,
             order = "ASC",
-            category = 0,       
+            category = 0,
             locationIds = [],
             jobNatureIds = []
         } = req.body || {};
-        
-        const vendors = await DB.r_fetchVendorsByTab({ 
-            category, 
-            tab, 
-            limit, 
-            locationIds, 
-            jobNatureIds, 
+
+        const vendors = await DB.r_fetchVendors({
+            queryString,
+            category,
+            tab,
+            limit,
+            locationIds,
+            jobNatureIds,
             order
         });
-        
+
         res.json(vendors);
     } catch (error) {
         console.error("Error fetching vendors:", error);
@@ -62,28 +64,6 @@ router.post("/search", async (req, res) => {
     }
 });
 
-// Get call to fetch All available Job Natures in Vendors List 
-router.get("/JobNatures", auth.authenticateJWT, async (req, res) =>{
-    try {
-        const JobNatures = await DB.r_fetchVendorsAllJobNatures();
-        res.json({ JobNatures});
-    } catch (error) {
-        console.error("Error fetching JobNatures:", error);
-        res.status(500).json({ message: "Internal server error" });
-    }
-})
-
-// Get call to fetch All available Locations in Vendors List 
-router.get("/Locations", auth.authenticateJWT, async (req, res) =>{
-    try {
-        const Locations = await DB.r_fetchVendorsAllLocations();
-        res.json({ Locations});
-    } catch (error) {
-        console.error("Error fetching JobNatures:", error);
-        res.status(500).json({ message: "Internal server error" });
-    }
-})
-
 // GET call to fetch all locations, job natures, and vendor count
 router.get("/metadata", async (req, res) => {
     try {
@@ -101,5 +81,41 @@ router.get("/metadata", async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 });
+
+// Insert vendor
+router.post("/add", async (req, res) => {
+    try {
+        const result = await DB.r_insertVendor(req.body);
+        res.json({ message: "Vendor added", id: result.id });
+    } catch (error) {
+        console.error("Insert error:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+// Update vendor
+router.put("/update/:id", async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const result = await DB.r_updateVendor(id, req.body);
+        res.json({ message: "Vendor updated", affected: result.affectedRows });
+    } catch (error) {
+        console.error("Update error:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
+// Delete vendor
+router.delete("/delete/:id", async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const result = await DB.r_deleteVendor(id);
+        res.json({ message: "Vendor deleted", affected: result.affectedRows });
+    } catch (error) {
+        console.error("Delete error:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
 
 export default router;

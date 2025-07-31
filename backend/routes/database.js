@@ -23,7 +23,7 @@ const pool = mysql.createPool({
 }).promise();
 
 
-// ----------------------- HELPING FUNCTIONS ----------------------- //
+// #region 🛠️ HELP FUNCTIONS ─────────────────────────────────────────────
 
 function safeParse(jsonField) {
     if (!jsonField) return {};
@@ -36,45 +36,9 @@ function safeParse(jsonField) {
     }
 }
 
-// ----------------------------- USER ----------------------------- //
+// #endregion
 
-// Function to fetch User by ID
-export async function r_fetchUserByID(user_id) {
-    const query = "SELECT * FROM users WHERE user_id = ?";
-    try {
-        const [row] = await pool.query(query, [user_id]);
-        return row[0] || null;
-    } catch (error) {
-        console.error("Error fetching DPR by ID:", error);
-        throw error;
-    }
-}
-
-// Function to fetch Multiple Users by ID
-export async function r_fetchUsersByID(user_ids) {
-    const placeHolder = user_ids.map(() => "?").join(', ');
-    const query = `SELECT * FROM users WHERE user_id IN (${placeHolder})`;
-
-    try {
-        const [rows] = await pool.query(query, user_ids);
-        return rows || null;
-    } catch (error) {
-        console.error("Error fetching DPR by ID:", error);
-        throw error;
-    }
-}
-
-// Function to fetch user_name by ID
-export async function r_fetchUserNameByID(user_id) {
-    const query = "SELECT user_name FROM users WHERE user_id = ?";
-    try {
-        const [row] = await pool.query(query, [user_id]);
-        return row[0].user_name || null;
-    } catch (error) {
-        console.error("Error fetching DPR by ID:", error);
-        throw error;
-    }
-}
+// #region 🧑‍💼 USERS  ─────────────────────────────────────────────
 
 // Function to fetch User by user_name
 export async function r_fetchUserByName(name) {
@@ -91,7 +55,7 @@ export async function r_fetchUserByName(name) {
 // Function to add user
 export async function r_addUser(user_data) {
     const query = "INSERT INTO users (user_name, user_password, email, phone_no) VALUES (?, ?, ?, ?);";
-    
+
     try {
         const [result] = await pool.query(query, user_data);
         return result[0];
@@ -99,6 +63,23 @@ export async function r_addUser(user_data) {
         console.error("Error adding user:", error);
         throw error;
     }
+}
+
+// Function to update password
+export async function r_updateUserPassword(user_id, hashed_password) {
+  const query = `
+    UPDATE users 
+    SET user_password = ? 
+    WHERE user_id = ?;
+  `;
+
+  try {
+    const [result] = await pool.query(query, [hashed_password, user_id]);
+    return result.affectedRows > 0;
+  } catch (error) {
+    console.error("Error updating user password:", error);
+    throw error;
+  }
 }
 
 // Function to check user_name exists
@@ -116,7 +97,7 @@ export async function r_usernameExist(user_name) {
 // Function to check Email or PhoneNo. is Taken
 export async function r_isEmailOrPhoneTaken(email, phone) {
     const query = "SELECT COUNT(*) AS count FROM users WHERE email = ? OR phone_no = ?";
-    
+
     try {
         const [rows] = await pool.query(query, [email, phone]);
         return rows[0].count > 0;
@@ -126,7 +107,9 @@ export async function r_isEmailOrPhoneTaken(email, phone) {
     }
 }
 
-// ---------------------- PROJECT ----------------------- //
+// #endregion
+
+// #region 🧱 PROJECT  ─────────────────────────────────────────────
 
 // Function to fetch Project by ID
 export async function r_getProjectById(project_id) {
@@ -149,33 +132,61 @@ export async function r_getProjectById(project_id) {
     }
 }
 
-// Function to insert Project
+// Function to fetch all projects a user is involved
+export async function r_fetchProjectsByUser(user_id) {
+    const query = `
+    SELECT 
+      p.project_id,
+      p.project_name,
+      p.project_description,
+      p.start_date,
+      p.end_date
+    FROM projects p
+    JOIN project_user_roles pur ON p.project_id = pur.project_id
+    WHERE pur.user_id = ?;
+  `;
+
+    try {
+        const [rows] = await pool.query(query, [user_id]);
+        return rows || [];
+    } catch (error) {
+        console.error("❌ Error fetching projects for user:", error);
+        throw error;
+    }
+}
+
+// Function to insert Project  ###### Hardcoded 
 export async function r_insertProject(data) {
     const {
         project_name,
+        user_id = null,
         project_description = null,
         start_date = null,
         end_date = null,
         location = null,
         contract_no = null,
-        Employer = null,
-        user_roles = {}
+        Employer = null
     } = data;
 
     if (!project_name) {
         throw new Error("Missing required fields: project_name");
     }
 
-    const query = `
+    const projQuery = `
         INSERT INTO projects (
-            user_roles, project_name, project_description,
+            project_name, project_description,
             start_date, end_date, location,
             contract_no, Employer
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?);
+    `;
+
+    const roleQuery = `
+        INSERT INTO project_user_roles (
+            project_id, user_id, role_id
+        ) VALUES (?, ?, ?);
     `;
 
     const values = [
-        JSON.stringify(user_roles),
         project_name,
         project_description,
         start_date,
@@ -186,8 +197,9 @@ export async function r_insertProject(data) {
     ];
 
     try {
-        const [result] = await pool.query(query, values);
-        return result.insertId;
+        const [projResult] = await pool.query(projQuery, values);
+        await pool.query(roleQuery, [projResult.insertId, user_id, 1]);
+        return projResult.insertId;
     } catch (error) {
         console.error("❌ Error inserting project:", error.message);
         throw error;
@@ -198,7 +210,6 @@ export async function r_insertProject(data) {
 export async function r_updateProject(data) {
     const {
         project_id,
-        user_roles = {},
         project_name,
         project_description = null,
         start_date = null,
@@ -215,7 +226,6 @@ export async function r_updateProject(data) {
     const query = `
         UPDATE projects
         SET 
-            user_roles = ?,
             project_name = ?,
             project_description = ?,
             start_date = ?,
@@ -227,7 +237,6 @@ export async function r_updateProject(data) {
     `;
 
     const values = [
-        JSON.stringify(user_roles),
         project_name,
         project_description,
         start_date,
@@ -247,61 +256,37 @@ export async function r_updateProject(data) {
     }
 }
 
+// Function to get a user role in project
+export async function r_fetchRole(user_id, project_id) {
+    const relation_query = `
+        SELECT role_id 
+        FROM project_user_roles 
+        WHERE user_id = ? AND project_id = ?;
+    `; 
+    
+    const role_query = `
+        SELECT * 
+        FROM roles 
+        WHERE role_id = ?;
+    `; 
 
-// ------------------------ DPR ------------------------- //
+    try {
+        const [rows] = await pool.query(relation_query, [user_id, project_id]);
+        const role_id = rows.length > 0 ? rows[0].role_id : null;
 
-const dprFormat = {
-    project_id: null,
-    report_date: "",
+        if (!role_id) return null;
 
-    site_condition: {
-        ground_state: "",         // e.g., "dry", "slushy"
-        is_rainy: false,          // true/false
-        rain_timing: []           // e.g., ["10:10-11:00", "01:05-02:00"]
-    },
+        const [data] = await pool.query(role_query, [role_id]);
+        return data[0] || null;
+    } catch (error) {
+        console.error("❌ Error fetching role for user:", error);
+        throw error;
+    }
+}
 
-    labour_report: {
-        agency: [],               // List of agency names
-        mason: [],                // Count per agency
-        carp: [],
-        fitter: [],
-        electrical: [],
-        painter: [],
-        gypsum: [],
-        plumber: [],
-        helper: [],
-        staff: [],
-        remarks: ""               // Any remarks
-    },
+// #endregion
 
-    cumulative_manpower: null,   // Total manpower count (including today)
-
-    today_prog: {
-        progress: [],             // e.g., ["cement imported.", "water distributed."]
-        qty: []                   // e.g., ["1kg", "5L"]
-    },
-
-    tomorrow_plan: {
-        plan: [],                 // e.g., ["cement imported.", "water distributed."]
-        qty: []                   // e.g., ["1kg", "5L"]
-    },
-
-    user_roles: {
-        created_by: null,
-        approvals: {},            // e.g., { "1": true, "3": false }
-        viewers: [],              // user IDs
-        editors: []               // user IDs
-    },
-
-    report_footer: {
-        events_visit: [],         // e.g., [{ time: "10:00", note: "VIP visit" }] or just []
-        distribute: [],           // e.g., ["L&T", "MAPLANI"]
-        prepared_by: ""           // Name of preparer
-    },
-
-    created_at: ""               // e.g., "2025-01-19 12:00:00"
-};
-
+// #region 📝 DPR  ─────────────────────────────────────────────
 
 // Function to fetch DPR by ID
 export async function r_getDPRById(dpr_id) {
@@ -338,13 +323,24 @@ export async function r_insertDPR(dprData) {
         throw new Error("Missing required fields: project_id or report_date");
     }
 
-    const query = `
-    INSERT INTO dpr (
-        project_id, report_date, site_condition, labour_report,
-        cumulative_manpower, today_prog, tomorrow_plan,
-        user_roles, report_footer, created_at
-    ) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    // Step 1: Check if DPR already exists for same project and date
+    const checkQuery = `
+        SELECT dpr_id FROM dpr WHERE project_id = ? AND report_date = ? LIMIT 1;
+    `;
+    const [existing] = await pool.query(checkQuery, [dprData.project_id, dprData.report_date]);
+
+    if (existing.length > 0) {
+        return { ok: false, message: "DPR already exists for this date.", data: null };
+    }
+
+    // Step 2: Insert new DPR
+    const insertQuery = `
+        INSERT INTO dpr (
+            project_id, report_date, site_condition, labour_report,
+            cumulative_manpower, today_prog, tomorrow_plan,
+            user_roles, report_footer, created_at
+        ) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     `;
 
     const values = [
@@ -361,8 +357,12 @@ export async function r_insertDPR(dprData) {
     ];
 
     try {
-        const [result] = await pool.query(query, values);
-        return result.insertId;
+        const [result] = await pool.query(insertQuery, values);
+        return {
+            ok: true,
+            message: "DPR inserted successfully.",
+            data: { insertId: result.insertId }
+        };
     } catch (error) {
         console.error("❌ Error inserting DPR:", error.message, "\nData:", dprData);
         throw error;
@@ -415,39 +415,94 @@ export async function r_updateDPR(dprData) {
     }
 }
 
-// Function to fetch last DPR cummulative manpower
-export async function r_fetchLastManPower(project_id) {
-    const query = "SELECT cumulative_manpower FROM DPR WHERE project_id = ? ORDER BY report_date DESC LIMIT 1;";
+// Function to fetch the last DPR of a project
+export async function r_fetchLastDPR(project_id) {
+    const query = `
+        SELECT * FROM dpr
+        WHERE project_id = ?
+        ORDER BY report_date DESC
+        LIMIT 1;
+    `;
+
     try {
-        const [data] = await pool.query(query, [project_id]);
-        return data.length > 0 ? data[0].cumulative_manpower : 0;
+        const [rows] = await pool.query(query, [project_id]);
+        return rows[0] || null;
     } catch (error) {
-        console.error("❌ Error fetching last DPR cumulative manpower:", error);
+        console.error("❌ Error fetching last DPR:", error);
         throw error;
     }
 }
 
-// Function to structure raw DPR into formatted object
-export async function DprInit(project_id, report_by) {
+// Function to fetch all DPR under a specific Project
+export async function r_fetchDPRsByProject(project_id, limit = 20) {
+    const query = `
+    SELECT 
+      dpr_id,
+      report_date,
+      user_roles
+    FROM dpr
+    WHERE project_id = ?
+    ORDER BY report_date DESC
+    LIMIT ?;
+  `;
 
-    const project_data = r_fetchProjectByID(project_id);
-    let dpr = dprFormat;
+    try {
+        const [rows] = await pool.query(query, [project_id, Number(limit)]);
 
-    dpr.project_id = project_id;
-    dpr.reported_by = report_by;
-    dpr.report_date = new Date().toISOString().split("T")[0];
-    dpr.cumulative_manpower = await r_fetchLastManPower(project_id);
-    dpr.labour_report.agency = project_data.agency.split(",");
-    dpr.project_name = project_data.project_name;
-    dpr.employer = project_data.employer;
+        const results = rows.map(row => {
+            let userRoles = row.user_roles;
 
-    return dpr;   
+            if (typeof userRoles === "string") {
+                try {
+                    userRoles = JSON.parse(userRoles);
+                } catch (e) {
+                    console.warn("⚠️ Failed to parse user_roles:", e);
+                    userRoles = {};
+                }
+            }
+
+            const approvals = userRoles.approvals || {};
+
+
+            const approverValues = Object.values(approvals);
+            console.log(approvals);
+            const approved = approverValues.length === 0 || approverValues.every(v => v === true || v === "true");
+
+            return {
+                dpr_id: row.dpr_id,
+                report_date: row.report_date,
+                approval_status: approved
+            };
+        });
+
+        return results;
+    } catch (error) {
+        console.error("❌ Error fetching DPRs for project:", error);
+        throw error;
+    }
+}
+
+// Function to fetch project_id from 
+export async function r_getProjByDprID(dpr_id) {
+    const query = `SELECT project_id FROM dpr WHERE dpr_id = ?`;
+    try {
+        const [rows] = await pool.query(query, [dpr_id]);
+        if (!rows.length) {
+            return { ok: false, message: "No DPR found for that ID.", project_id: null };
+        }
+        return { ok: true, project_id: rows[0].project_id };
+    } catch (error) {
+        console.error("❌ Error fetching DPR by ID:", error.message);
+        throw error;
+    }
 }
 
 
-// ----------------------- VENDOR ----------------------- //
+// #endregion
 
-// Function to fetch vendors with pagination and filtering
+// #region 🏷️ VENDOR ─────────────────────────────────────────────
+
+// Fetch vendors with pagination and filtering
 export async function r_fetchVendorsByTab({
     category = 0,
     tab = 1,
@@ -456,33 +511,33 @@ export async function r_fetchVendorsByTab({
     jobNatureIds = [],
     order = 'ASC'
 } = {}) {
+    limit = Math.max(1, Math.min(limit, 100));
+    tab = Math.max(1, tab);
 
     const offset = (tab - 1) * limit;
-    
-    let baseQuery = "FROM vendors";
+
+    let baseQuery = "FROM vendors WHERE 1=1";
     const params = [];
 
     if (category !== 0) {
-        baseQuery += " WHERE category_id = ?";
+        baseQuery += " AND category_id = ?";
         params.push(category);
-    } else {
-        baseQuery += " WHERE 1";
     }
-    
+
     if (locationIds.length > 0) {
         baseQuery += ` AND location_id IN (${locationIds.map(() => '?').join(',')})`;
         params.push(...locationIds);
     }
-    
+
     if (jobNatureIds.length > 0) {
         baseQuery += ` AND job_nature_id IN (${jobNatureIds.map(() => '?').join(',')})`;
         params.push(...jobNatureIds);
     }
-    
-    let query = `SELECT * ${baseQuery} ORDER BY name ${order === 'DESC' ? 'DESC' : 'ASC'} LIMIT ? OFFSET ?`;
+
+    const query = `SELECT * ${baseQuery} ORDER BY name ${order === 'DESC' ? 'DESC' : 'ASC'} LIMIT ? OFFSET ?`;
     params.push(limit, offset);
-    
-    let countQuery = `SELECT COUNT(*) AS total ${baseQuery}`;
+
+    const countQuery = `SELECT COUNT(*) AS total ${baseQuery}`;
 
     try {
         const [[{ total }]] = await pool.query(countQuery, params.slice(0, -2));
@@ -498,19 +553,7 @@ export async function r_fetchVendorsByTab({
     }
 }
 
-// Generic function to fetch ID-name pairs from any table
-export async function r_fetchIdNamePairs(tableName) {
-    const query = `SELECT id, name FROM \`${tableName}\``;
-    try {
-        const [rows] = await pool.query(query);
-        return Object.fromEntries(rows.map(row => [row.name, row.id]));
-    } catch (error) {
-        console.error(`Error fetching data from ${tableName}:`, error);
-        throw error;
-    }
-}
-
-// Function to fetch Count of vendors in table
+// Fetch Count of vendors in table
 export async function r_fetchVendorsCount() {
     const query = "SELECT COUNT(*) AS count FROM vendors";
     try {
@@ -522,41 +565,56 @@ export async function r_fetchVendorsCount() {
     }
 }
 
-// Function to fetch all Job Natures in table
+// Fetch all Job Natures in table
 export async function r_fetchVendorsAllJobNatures() {
-    return await r_fetchIdNamePairs("JobNatures");
+    const query = `SELECT job_id, job_name FROM job_nature`;
+    try {
+        const [rows] = await pool.query(query);
+        return Object.fromEntries(rows.map(row => [row.job_name, row.job_id]));
+    } catch (error) {
+        console.error(`Error fetching data from job_nature:`, error);
+        throw error;
+    }
 }
 
-// Function to fetch all Locations in table
+// Fetch all Locations in table
 export async function r_fetchVendorsAllLocations() {
-    return await r_fetchIdNamePairs("Locations");
+    const query = `SELECT loc_id, loc_name FROM locations`;
+    try {
+        const [rows] = await pool.query(query);
+        return Object.fromEntries(rows.map(row => [row.loc_name, row.loc_id]));
+    } catch (error) {
+        console.error(`Error fetching data from locations:`, error);
+        throw error;
+    }
 }
 
-// Function to fetch all Locations in table
-export async function r_searchVendors({
+// Fetch all Locations in table
+export async function r_fetchVendors({
     queryString = "",
-    category = 1,
+    category = 0,
     tab = 1,
     limit = 25,
     locationIds = [],
     jobNatureIds = [],
+    order = 'ASC'
 } = {}) {
+    const offset = (tab - 1) * limit;
+
     const { vendors } = await r_fetchVendorsByTab({
         category,
-        tabNumber: 1,
-        limit: 10000, 
+        tab: 1,
+        limit: 100000,
         locationIds,
         jobNatureIds,
+        order
     });
 
-    if (!vendors || vendors.length === 0) {
-        console.log("No vendors found");
-        return [];
-    }
-
     if (!queryString.trim()) {
-        const offset = (tab - 1) * limit;
-        return vendors.slice(offset, offset + limit);
+        return {
+            vendors: vendors.slice(offset, offset + limit),
+            vendorCount: vendors.length
+        };
     }
 
     const fuse = new Fuse(vendors, {
@@ -564,57 +622,89 @@ export async function r_searchVendors({
         threshold: 0.4,
     });
 
-    let results = fuse.search(queryString).map(result => result.item);
-
-    const vendorCount = results.length;
-    const offset = (tab - 1) * limit;
-    results = results.slice(offset, offset + limit)
+    const results = fuse.search(queryString).map(r => r.item);
     return {
-        vendors: results,
-        vendorCount,
+        vendors: results.slice(offset, offset + limit),
+        vendorCount: results.length
     };
 }
 
+// Insert a new vendor
+export async function r_insertVendor(data) {
+    const query = `
+        INSERT INTO vendors (
+            name, job_nature_id, contact_person, telephone_no, mobile,
+            location_id, email, address, gst_no, constitution,
+            website, reference, remarks, category_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const params = [
+        data.name, data.job_nature_id, data.contact_person, data.telephone_no, data.mobile,
+        data.location_id, data.email, data.address, data.gst_no, data.constitution,
+        data.website, data.reference, data.remarks, data.category_id
+    ];
 
-const dprData = {
-    project_id: 1,
-    reported_by: 5,
-    report_date: "2024-03-18",
-    site_condition: {
-        ground_state: "slushy",
-        weather_state: "rainy", 
-        timing: ["11:00-12:00", "13:00-14:25"]
-    },
-    labour_report: {
-        agency: ["MAPLANI", "L&T", "AMAZON", "NVIDIA"],
-        mason: [0, 0, 1, 0],
-        carp: [1, 0, 3, 5],
-        fitter: [2, 1, 0, 4],
-        electrical: [0, 2, 1, 3],
-        painter: [1, 1, 0, 0],
-        gypsum: [3, 0, 2, 1],
-        plumber: [0, 0, 0, 2],
-        helper: [5, 2, 3, 1],
-        staff: [2, 1, 1, 0],
-        remarks: "Nices remark"
-    },
-    cumulative_manpower: 20,
-    today_prog: [{ "task": "Task one done", "qty": "1Kg" }, { "task": "Task two done", "qty": "7Kg" }, { "task": "Task three done", "qty": "1L" }],
-    tomorrow_plan: [{ "task": "Task seven done", "qty": "1Kg" }, { "task": "Task eight done", "qty": "7Kg" }, { "task": "Task nine done", "qty": "1L" }],
-    events_visit: "Safety audit scheduled",
-    distribute: "Material to be distributed",
-    prepared_by: "Site Manager",
-    approval: {
-        "Mano Bharathi": true,
-        "Rajesh": true,
-        "Sathish Nadar": false
+    const [result] = await pool.query(query, params);
+    return { id: result.insertId };
+}
+
+// Update existing vendor
+export async function r_updateVendor(id, data) {
+    const query = `
+        UPDATE vendors SET
+            name = ?, job_nature_id = ?, contact_person = ?, telephone_no = ?, mobile = ?,
+            location_id = ?, email = ?, address = ?, gst_no = ?, constitution = ?,
+            website = ?, reference = ?, remarks = ?, category_id = ?
+        WHERE id = ?
+    `;
+    const params = [
+        data.name, data.job_nature_id, data.contact_person, data.telephone_no, data.mobile,
+        data.location_id, data.email, data.address, data.gst_no, data.constitution,
+        data.website, data.reference, data.remarks, data.category_id,
+        id
+    ];
+
+    const [result] = await pool.query(query, params);
+    return { affectedRows: result.affectedRows };
+}
+
+// Delete vendor
+export async function r_deleteVendor(id) {
+    const query = `DELETE FROM vendors WHERE id = ?`;
+    const [result] = await pool.query(query, [id]);
+    return { affectedRows: result.affectedRows };
+}
+
+// #endregion
+
+// #region 🧬 CROSS MODULE ─────────────────────────────────────────────
+
+// Fetches user roles for a user in a given project
+export async function r_getUserRoleForProject(user_id, project_id) {
+    const query = `
+        SELECT r.*
+        FROM project_user_roles upr
+        JOIN roles r ON upr.role_id = r.role_id
+        WHERE upr.user_id = ? AND upr.project_id = ?;
+    `;
+    const params = [user_id, project_id];
+
+    try {
+        const [[rows]] = await pool.query(query, params);
+        console.log(rows)
+        return rows
+    } catch (error) {
+        console.error("Error fetching vendors:", error);
+        throw error;
     }
-};
+}
 
 
+// #endregion
 
-// const t = await r_fetchUserByID(2)
+// const t = await r_getProjByDprID(12)
 // console.log(t)
 
 
 // pool.end()
+
