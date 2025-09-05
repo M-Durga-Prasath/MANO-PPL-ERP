@@ -1,6 +1,6 @@
 import express from "express";
-import * as DB from "./database.js";
-import * as auth from "./auth.js";
+import * as DB from "../Database.js";
+
 
 const router = express.Router();
 
@@ -9,19 +9,19 @@ router.post("/", async (req, res) => {
     try {
         const {
             queryString = "",
-            tab = 1,
-            limit = 25,
+            limit = 11,
+            page = 1,
             order = "ASC",
             category = 0,
             locationIds = [],
             jobNatureIds = []
         } = req.body || {};
 
-        const vendors = await DB.r_fetchVendors({
+        const vendors = await DB.fetchVendors({
             queryString,
             category,
-            tab,
             limit,
+            page,
             locationIds,
             jobNatureIds,
             order
@@ -89,4 +89,3 @@ router.delete("/delete/:id", async (req, res) => {
 
 
 export default router;
-

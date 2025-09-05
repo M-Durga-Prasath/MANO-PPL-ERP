@@ -1,108 +1,50 @@
 // ====================== DEBUGGING HELPERS ======================
 function debugLog(message, data) {
-    console.log(`[DEBUG] ${message}`, data);
+  // console.log(`[DEBUG] ${message}`, data);
 }
 
 // ====================== MAIN DATA LOADER ======================
 document.addEventListener("DOMContentLoaded", async () => {
-    try {
-        debugLog("DOM fully loaded, starting data load");
-        
-        // Check for DPR ID in URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const dprId = urlParams.get('id');
-        debugLog("URL Parameters", {dprId});
-        
-        // Get project ID from localStorage
-        const projectId = localStorage.getItem('selected_project_id');
-        debugLog("LocalStorage projectId", projectId);
-        
-        if (dprId) {
-            debugLog("Fetching data from API for DPR ID:", dprId);
-            await fetchAndPopulateFromAPI(dprId, projectId);
-        } else {
-            debugLog("No DPR ID in URL, checking session storage");
-            const pdfDataString = sessionStorage.getItem('pdfPreviewData');
-            if (pdfDataString) {
-                debugLog("Found data in session storage");
-                const pdfData = JSON.parse(pdfDataString);
-                populateAllData(pdfData);
-            } else {
-                debugLog("No data available, showing error state");
-                showErrorState("No data available");
-            }
-        }
-        
-        debugLog("Initializing print button");
-        setupPrintButton();
-    } catch (error) {
-        console.error("Error loading data:", error);
-        showErrorState("Failed to load data");
-    }
+  try {
+    debugLog("DOM fully loaded, starting data load");
+
+    // Fetch both JSON files in parallel
+    const dprData = JSON.parse(localStorage.getItem("dprData"));
+    const projectData = JSON.parse(localStorage.getItem("projectData"));
+
+
+    debugLog("Loaded DPR Data", dprData);
+    debugLog("Loaded Project Data", projectData);
+
+    // Merge project data with DPR data
+    const mergedData = {
+      ...dprData,
+      projectDetails: projectData,
+    };
+
+    // Transform the merged data
+    const transformedData = transformApiData(mergedData);
+    debugLog("Transformed Data", transformedData);
+
+    // Populate the data
+    populateAllData(transformedData);
+  } catch (error) {
+    console.error("Error loading data:", error);
+    showErrorState("Failed to load data");
+  }
 });
 
-// ====================== API DATA FETCHING ======================
-async function fetchAndPopulateFromAPI(dprId, projectId) {
-    try {
-        debugLog(`Fetching DPR data for ID: ${dprId}`);
-        const dprResponse = await fetch(`http://34.93.159.62:3000/report/getDPR/${dprId}`);
-        if (!dprResponse.ok) throw new Error('Failed to fetch DPR data');
-        
-        const apiData = await dprResponse.json();
-        debugLog("API Response Data", apiData);
-        
-        if (!apiData.success) throw new Error('API returned unsuccessful response');
-        
-        // Fetch project details using projectId from localStorage
-        let projectDetails = {};
-        if (projectId) {
-            debugLog(`Fetching project details for ID: ${projectId}`);
-            const projectResponse = await fetch(`http://34.47.131.237:3000/project/getProject/${projectId}`);
-            if (projectResponse.ok) {
-                const projectData = await projectResponse.json();
-                if (projectData.success) {
-                    projectDetails = projectData.data;
-                    debugLog("Project Details", projectDetails);
-                }
-            }
-        }
-        
-        // Merge DPR data with project details
-        const mergedData = {
-            ...apiData.data,
-            projectDetails: projectDetails
-        };
-        debugLog("Merged Data", mergedData);
-        
-        // Transform API data to match our expected structure
-        const transformedData = transformApiData(mergedData);
-        debugLog("Transformed Data", transformedData);
-        
-        populateAllData(transformedData);
-        
-    } catch (error) {
-        console.error("Error loading data from API:", error);
-        showErrorState("Failed to load from API");
-        
-        // Fallback to session data if available
-        const pdfDataString = sessionStorage.getItem('pdfPreviewData');
-        if (pdfDataString) {
-            const pdfData = JSON.parse(pdfDataString);
-            populateAllData(pdfData);
-        }
-    }
-}
-
+// ====================== DATA TRANSFORMATION ======================
 function transformApiData(apiData) {
     debugLog("Transforming API Data", apiData);
     
     // Convert API data structure to match what our HTML expects
     const transformed = {
-        // Project Information
-        project_name: apiData.projectDetails?.project_name || apiData.project_name || "--",
-        Employer: apiData.projectDetails?.Employer || apiData.projectDetails?.client_name || apiData.Employer || "--",
+        // Project Information - now using projectDetails
+        project_name: apiData.projectDetails?.project_name || apiData.project_name || "Project Name Not Available",
+        Employer: apiData.projectDetails?.Employer || apiData.Employer || "Employer Not Available",
         contract_no: apiData.projectDetails?.contract_no || apiData.contract_no || "--",
-        location: apiData.projectDetails?.location || apiData.location || "--",
+        location: apiData.projectDetails?.location || apiData.location || "Location Not Available",
         start_date: apiData.projectDetails?.start_date 
             ? new Date(apiData.projectDetails.start_date).toLocaleDateString('en-GB') 
             : (apiData.start_date ? new Date(apiData.start_date).toLocaleDateString('en-GB') : "--"),
@@ -154,18 +96,16 @@ function formatLabourData(labourReport, cumulativeManpower = 0) {
         return { headers: [], tableData: [], cumulative_manpower: cumulativeManpower };
     }
 
-    // Extract all available labor types from the report
     const laborTypes = Object.keys(labourReport).filter(key => 
         key !== 'agency' && 
         key !== 'remarks' && 
         key !== 'k' && 
-        key !== 'ok' &&  // Exclude any non-labor type fields
+        key !== 'ok' &&
         Array.isArray(labourReport[key])
     );
     
     debugLog("Detected Labor Types", laborTypes);
 
-    // Create headers array - always start with Agency
     const headers = ['Agency Name', ...laborTypes, 'Total', 'Remarks'];
     debugLog("Generated Headers", headers);
 
@@ -181,38 +121,36 @@ function formatLabourData(labourReport, cumulativeManpower = 0) {
         const row = [];
         let total = 0;
 
-        // Agency Name
         const agency = labourReport.agency?.[i] || "--";
         row.push(agency);
 
-        // Labor counts
         laborTypes.forEach(type => {
             const count = parseInt(labourReport[type]?.[i]) || 0;
             row.push(count.toString());
             total += count;
         });
 
-        // Total
         row.push(total.toString());
 
-        // Remarks - Handle both array and string formats
-        const remark = Array.isArray(labourReport.remarks) 
-            ? labourReport.remarks[i] || labourReport.remarks[0] || "--"
-            : labourReport.remarks || "--";
-        row.push(remark);
+       let remark = "";
+if (Array.isArray(labourReport.remarks)) {
+    if (labourReport.remarks[i] !== undefined) {
+        remark = labourReport.remarks[i];
+    }
+} else if (labourReport.remarks !== undefined) {
+    remark = labourReport.remarks;
+}
+row.push(remark);
 
         tableData.push(row);
         debugLog(`Processed Row ${i}`, row);
     }
 
-    const result = { 
+    return { 
         headers, 
         tableData, 
         cumulative_manpower: cumulativeManpower 
     };
-    
-    debugLog("Formatted Labour Data Result", result);
-    return result;
 }
 
 function formatProgressData(progressData) {
@@ -253,67 +191,57 @@ function calculateDaysRemaining(endDate) {
 function populateAllData(data) {
     debugLog("Populating all data", data);
     
-    // 1. Populate Project Information
     populateProjectInfo(data);
     
-    // 2. Populate Site Conditions
     if (data.site_conditions) {
         populateSiteConditions(data.site_conditions);
     }
     
-    // 3. Populate Labour Report
     if (data.labour_data) {
         populateLabourReport(data.labour_data);
     }
     
-    // 4. Populate Progress Tables
     populateProgressTables(data);
-    
-    // 5. Populate Remarks and Events
     populateRemarksAndEvents(data);
 }
 
 function populateProjectInfo(data) {
-    debugLog("Populating Project Info", data);
-    
-    // Basic project info
-    document.getElementById("project_name").textContent = data.project_name || "--";
-    document.getElementById("Employer").textContent = data.Employer || "--";
-    document.getElementById("contract_no").textContent = data.contract_no || "--";
-    document.getElementById("location").textContent = data.location || "--";
-    document.getElementById("start_date").textContent = data.start_date || "--";
-    document.getElementById("end_date").textContent = data.end_date || "--";
-    
-    // Report date in header
-    const reportDateElement = document.querySelector(".daily-progress-report-table tr:nth-child(2) td:nth-child(2)");
-    if (reportDateElement) {
-        reportDateElement.textContent = data.report_date || "--";
-    }
-    
-    // Duration info
-    const totalDaysElement = document.querySelector(".total-value");
-    if (totalDaysElement) {
-        totalDaysElement.textContent = data.total_days || "--";
-    }
-    
-    const daysRemainingElement = document.querySelector(".balance-right");
-    if (daysRemainingElement) {
-        daysRemainingElement.textContent = data.days_remaining || "--";
-    }
+  debugLog("Populating Project Info", data);
+
+  document.getElementById("project_name").textContent =
+    data.project_name || "--";
+  document.getElementById("Employer").textContent = data.Employer || "--";
+  document.getElementById("project_code").textContent = data.project_code || "--";
+  document.getElementById("location").textContent = data.location || "--";
+  document.getElementById("start_date").textContent = data.start_date || "--";
+  document.getElementById("end_date").textContent = data.end_date || "--";
+
+  const reportDateElement = document.querySelector(
+    ".daily-progress-report-table tr:nth-child(2) td:nth-child(2)"
+  );
+  if (reportDateElement) {
+    reportDateElement.textContent = data.report_date || "--";
+  }
+
+  const totalDaysElement = document.querySelector(".total-value");
+  if (totalDaysElement) {
+    totalDaysElement.textContent = data.total_days || "--";
+  }
+
+  const daysRemainingElement = document.querySelector(".balance-right");
+  if (daysRemainingElement) {
+    daysRemainingElement.textContent = data.days_remaining || "--";
+  }
 }
 
 function populateSiteConditions(conditions) {
     if (!conditions) return;
     
-    // Weather conditions
     setCheckboxState("normal-day-checkbox", conditions.normal_day);
     setCheckboxState("rainy-day-checkbox", conditions.rainy_day);
-    
-    // Ground conditions
     setCheckboxState("slushy-day-checkbox", conditions.slushy_day);
     setCheckboxState("dry-day-checkbox", conditions.dry_day);
     
-    // Time slots
     const timeSlotsContainer = document.querySelector(".from-to");
     if (timeSlotsContainer && conditions.time_slots) {
         timeSlotsContainer.innerHTML = conditions.time_slots
@@ -347,17 +275,14 @@ function populateLabourReport(labourData) {
     const tbody = table.querySelector('tbody') || table.createTBody();
     tbody.innerHTML = '';
     
-    // Create header row dynamically
     const headerRow = document.createElement('tr');
     labourData.headers.forEach(header => {
         const th = document.createElement('th');
-        th.textContent = header.toUpperCase(); // Capitalize header text
+        th.textContent = header.toUpperCase();
         headerRow.appendChild(th);
     });
     tbody.appendChild(headerRow);
-    debugLog("Added table headers", labourData.headers);
     
-    // Add data rows
     labourData.tableData.forEach((row, index) => {
         const tr = document.createElement('tr');
         row.forEach(cell => {
@@ -366,25 +291,19 @@ function populateLabourReport(labourData) {
             tr.appendChild(td);
         });
         tbody.appendChild(tr);
-        debugLog(`Added row ${index}`, row);
     });
     
-        // Populate cumulative manpower fields
     if (labourData.cumulative_manpower) {
-        // Step 1: Calculate today's total manpower from labour tableData
         let todayTotal = 0;
         labourData.tableData.forEach(row => {
-            // The second last cell is the total (before remarks)
             const totalCell = row[labourData.headers.length - 2];
             const total = parseInt(totalCell) || 0;
             todayTotal += total;
         });
 
-        // Step 2: Calculate yesterday's cumulative by subtracting today's from total
         const cumulativeToday = parseInt(labourData.cumulative_manpower) || 0;
         const cumulativeYesterday = cumulativeToday - todayTotal;
 
-        // Step 3: Populate the fields
         const cumulativeYesterdayEl = document.getElementById('cumulative-manpower-untill-yesterday');
         if (cumulativeYesterdayEl) {
             cumulativeYesterdayEl.textContent = cumulativeYesterday.toString();
@@ -394,72 +313,65 @@ function populateLabourReport(labourData) {
         if (cumulativeTodayEl) {
             cumulativeTodayEl.textContent = cumulativeToday.toString();
         }
-
-        debugLog("Cumulative manpower breakdown", {
-            todayTotal,
-            cumulativeToday,
-            cumulativeYesterday
-        });
     }
-
 }
 
 function populateProgressTables(data) {
-    // Today's Progress
+    const todayProgress = data.today_progress || [];
+    const tomorrowPlanning = data.tomorrow_planning || [];
+
+    const maxRows = Math.max(todayProgress.length, tomorrowPlanning.length);
+
     const todayTable = document.getElementById('today-table');
-    if (todayTable && data.today_progress) {
+    const tomorrowTable = document.getElementById('tomorrow-table');
+
+    if (todayTable) {
         const tbody = todayTable.querySelector('tbody') || todayTable.createTBody();
         tbody.innerHTML = '';
-        
-        // Add header
+
+        // Header
         const headerRow = document.createElement('tr');
-        headerRow.innerHTML = `
-            <th style="text-align: center;">Task</th>
-            <th>Quantity</th>
-        `;
+        headerRow.innerHTML = `<th style="text-align: center;">Task</th><th>Quantity</th>`;
         tbody.appendChild(headerRow);
-        
-        // Add data rows
-        data.today_progress.forEach(row => {
+
+        // Data rows
+        for (let i = 0; i < maxRows; i++) {
+            const rowData = todayProgress[i] || ["--", "--"];
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td style="text-align: left;">${row[0] || "--"}</td>
-                <td style="text-align: center;">${row[1] || "--"}</td>
+                <td style="text-align: left;">${rowData[0]}</td>
+                <td style="text-align: center;">${rowData[1]}</td>
             `;
             tbody.appendChild(tr);
-        });
+        }
     }
-    
-    // Tomorrow's Planning
-    const tomorrowTable = document.getElementById('tomorrow-table');
-    if (tomorrowTable && data.tomorrow_planning) {
+
+    if (tomorrowTable) {
         const tbody = tomorrowTable.querySelector('tbody') || tomorrowTable.createTBody();
         tbody.innerHTML = '';
-        
-        // Add header
+
+        // Header
         const headerRow = document.createElement('tr');
-        headerRow.innerHTML = `
-            <th style="text-align: center;">Task</th>
-            <th>Quantity</th>
-        `;
+        headerRow.innerHTML = `<th style="text-align: center;">Task</th><th>Quantity</th>`;
         tbody.appendChild(headerRow);
-        
-        // Add data rows
-        data.tomorrow_planning.forEach(row => {
+
+        // Data rows
+        for (let i = 0; i < maxRows; i++) {
+            const rowData = tomorrowPlanning[i] || ["--", "--"];
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td style="text-align: left;">${row[0] || "--"}</td>
-                <td style="text-align: center;">${row[1] || "--"}</td>
+                <td style="text-align: left;">${rowData[0]}</td>
+                <td style="text-align: center;">${rowData[1]}</td>
             `;
             tbody.appendChild(tr);
-        });
+        }
     }
 }
+
 
 function populateRemarksAndEvents(data) {
     debugLog("Populating Remarks and Events", data);
     
-    // Events
     const eventsContainer = document.querySelector('.events-container');
     if (eventsContainer) {
         eventsContainer.innerHTML = '';
@@ -472,10 +384,8 @@ function populateRemarksAndEvents(data) {
             div.textContent = events[i] || "--";
             eventsContainer.appendChild(div);
         }
-        debugLog("Added events", events);
     }
     
-    // Remarks
     const remarksContainer = document.querySelector('.remarks-content-container');
     if (remarksContainer) {
         remarksContainer.innerHTML = '';
@@ -489,10 +399,8 @@ function populateRemarksAndEvents(data) {
             div.textContent = remarks[i] || "--";
             remarksContainer.appendChild(div);
         }
-        debugLog("Added remarks", remarks);
     }
     
-    // Signatures
     if (data.prepared_by) {
         document.getElementById('prepared-by').textContent = data.prepared_by;
     }
@@ -503,73 +411,15 @@ function populateRemarksAndEvents(data) {
 
 // ====================== HELPER FUNCTIONS ======================
 function setCheckboxState(elementId, isActive) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        if (isActive) {
-            element.style.backgroundColor = "green";
-            element.textContent = "✓";
-            element.style.color = "white";
-        } else {
-            element.style.backgroundColor = "";
-            element.textContent = "";
-        }
+  const element = document.getElementById(elementId);
+  if (element) {
+    if (isActive) {
+      element.style.backgroundColor = "green";
+      element.textContent = "✓";
+      element.style.color = "white";
+    } else {
+      element.style.backgroundColor = "";
+      element.textContent = "";
     }
-}
-
-function setupPrintButton() {
-    const printButton = document.getElementById('download-pdf');
-    if (printButton) {
-        printButton.addEventListener('click', () => {
-            const style = document.createElement('style');
-            style.innerHTML = `
-                @page {
-                    size: A4;
-                    margin: 10mm;
-                }
-                body {
-                    margin: 0;
-                    padding: 0;
-                }
-                table {
-                    page-break-inside: auto;
-                }
-                tr {
-                    page-break-inside: avoid;
-                    page-break-after: auto;
-                }
-                .remarks-content, .events-content {
-                    page-break-inside: avoid;
-                }
-            `;
-            document.head.appendChild(style);
-            
-            window.print();
-            
-            setTimeout(() => {
-                document.head.removeChild(style);
-            }, 1000);
-        });
-    }
-}
-
-function showErrorState(message = "Failed to load report data") {
-    // Mark all fields as unavailable
-    document.querySelectorAll('.info-value, td').forEach(el => {
-        if (el.textContent.trim() === "") {
-            el.textContent = "UNAVAILABLE";
-            el.style.color = "red";
-        }
-    });
-    
-    // Show error message
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-message';
-    errorDiv.textContent = message;
-    errorDiv.style.color = 'red';
-    errorDiv.style.padding = '10px';
-    errorDiv.style.margin = '10px 0';
-    errorDiv.style.border = '1px solid red';
-    errorDiv.style.textAlign = 'center';
-    
-    document.body.insertBefore(errorDiv, document.body.firstChild);
+  }
 }
