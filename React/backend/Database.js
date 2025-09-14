@@ -207,6 +207,25 @@ export async function getControlType(controller_id, controlled_id) {
     }
 }
 
+// Function to get all controlled user_id and user_name
+export async function getControlledUsers(controller_id) {
+  const sql = `
+    SELECT tc.controlled_id,tc.control_type, u.user_name
+    FROM task_control tc
+    JOIN users u ON tc.controlled_id = u.user_id
+    WHERE tc.controller_id = ?;
+  `;
+  try {
+    const [rows] = await pool.query(sql, [controller_id]);
+    // rows will be an array of objects { controlled_id, control_type, user_name }
+    return rows;
+  } catch (err) {
+    console.error("❌ Error fetching controlled users:", err.message);
+    throw err;
+  }
+}
+
+
 // export async function getAssignedTo() {
     
 // }
@@ -327,7 +346,7 @@ export async function r_insertProject(data) {
 
         // Always set reporter to creator if not already set
         if (!user_roles.reporter) {
-            user_roles.reporter = created_by; // Always set reporter to creator
+          user_roles.reporter = { insert: [created_by] }; // Wrap as insert array
         }
         if (user_roles && typeof user_roles === 'object' && Object.keys(user_roles).length > 0) {
             const roleUpdateResult = await patchProjectRoles(newProjectId, user_roles);
@@ -982,17 +1001,31 @@ async function patchProjectRoles(project_id, changes) {
       const role_id = roleNameToId[role];
       if (!role_id) continue;
 
+      // For roles that are single-value: only "approver" and "final_approver"
       if (role === "approver" || role === "final_approver") {
-        if (change) { 
-          deletePairs.push([project_id, change]);
-          insertRows.push([project_id, change, role_id]);
+        if (change) {
+          deletePairs.push([project_id, Number(change)]);
+          insertRows.push([project_id, Number(change), role_id]);
         }
-      } else if (change) {
+      }
+      // For roles that are multi-value: "client", "reporter"
+      else if (role === "client" || role === "reporter") {
+        if (change) {
+          if (change.delete?.length) {
+            change.delete.forEach(uid => deletePairs.push([project_id, Number(uid)]));
+          }
+          if (change.insert?.length) {
+            change.insert.forEach(uid => insertRows.push([project_id, Number(uid), role_id]));
+          }
+        }
+      }
+      // For any other roles, treat as multi-value (future-proofing)
+      else if (change) {
         if (change.delete?.length) {
-          change.delete.forEach(uid => deletePairs.push([project_id, uid]));
+          change.delete.forEach(uid => deletePairs.push([project_id, Number(uid)]));
         }
         if (change.insert?.length) {
-          change.insert.forEach(uid => insertRows.push([project_id, uid, role_id]));
+          change.insert.forEach(uid => insertRows.push([project_id, Number(uid), role_id]));
         }
       }
     }
@@ -1027,7 +1060,7 @@ async function patchProjectRoles(project_id, changes) {
     console.error("❌ Error updating roles:", err);
     return { ok: false, msg: err.message };
   }
-} 
+}
 
 
 // #endregion

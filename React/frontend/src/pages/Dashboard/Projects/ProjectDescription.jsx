@@ -14,6 +14,7 @@ function ProjectDescription() {
   useEffect(() => {
     if (!projectId) return;
 
+    // fetch project
     fetch(`http://${API_URI}:${PORT}/project/getProject/${projectId}`, {
       credentials: "include",
     })
@@ -23,18 +24,29 @@ function ProjectDescription() {
       })
       .catch((err) => console.error("Failed to load project:", err));
 
+    // fetch DPRs + role
     fetch(`http://${API_URI}:${PORT}/report/Alldpr/${projectId}`, {
       credentials: "include",
     })
       .then((res) => res.json())
-      .then((dprs2) => {
-        if (!Array.isArray(dprs2)) {
-          console.error("Unexpected DPRs response:", dprs2);
+      .then((data) => {
+        if (!data || !data.projects) {
+          console.error("Unexpected DPRs response:", data);
           return;
         }
 
-        dprs2.sort((a, b) => new Date(b.report_date) - new Date(a.report_date));
-        setDprs(dprs2);
+        let dprsList = data.projects;
+        const role = data.role?.role.role_name || "";
+
+        // special case for client
+        if (role.toLowerCase() === "client") {
+          dprsList = dprsList.filter((d) => d.dpr_status === "approved");
+        }
+
+        dprsList.sort(
+          (a, b) => new Date(b.report_date) - new Date(a.report_date)
+        );
+        setDprs(dprsList);
       })
       .catch((err) => console.error("Failed to load DPRs:", err));
   }, [projectId]);
@@ -54,6 +66,30 @@ function ProjectDescription() {
     const percent = Math.floor((elapsed / total) * 100);
     return `${percent}%`;
   };
+
+  //#region  helpers
+  const getStatusClasses = (status) => {
+    switch (status) {
+      case "approved":
+        return "bg-green-900 text-green-300";
+      case "under_review":
+        return "bg-yellow-900 text-yellow-300";
+      case "final_review":
+        return "bg-blue-900 text-blue-300";
+      case "in_progress":
+        return "bg-orange-900 text-orange-300";
+      default:
+        return "bg-gray-700 text-gray-300";
+    }
+  };
+
+  const totitlecase = (input) => {
+    return input
+      .split(/[_\s-]+/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  };
+  //#endregion
 
   return (
     <div className="flex h-screen bg-background">
@@ -283,26 +319,9 @@ function ProjectDescription() {
                         ? "Yesterday"
                         : `${diffDays} days ago`;
 
-                    //different colors for progress tracking
-                    const getStatusClasses = (status) => {
-                      switch (status) {
-                        case "approved":
-                          return "bg-green-900 text-green-300";
-                        case "under_review":
-                          return "bg-yellow-900 text-yellow-300";
-                        case "final_review":
-                          return "bg-blue-900 text-blue-300";
-                        case "in_progress":
-                          return "bg-orange-900 text-orange-300";
-                        default:
-                          return "bg-gray-700 text-gray-300";
-                      }
-                    };
-
                     const userId = JSON.parse(
                       localStorage.getItem("session")
                     ).user_id;
-                    // console.log("us",userId)
                     const isHandler =
                       dpr.current_handler?.toString() === userId?.toString();
                     const borderClass = isHandler
@@ -336,9 +355,7 @@ function ProjectDescription() {
                               dpr.dpr_status
                             )}`}
                           >
-                            {dpr.dpr_status
-                              ? dpr.dpr_status.replace("_", " ")
-                              : "N/A"}
+                            {totitlecase(dpr.dpr_status)}
                           </span>
                           <span className="material-icons text-base">
                             today
