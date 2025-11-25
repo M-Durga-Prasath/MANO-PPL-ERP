@@ -3,10 +3,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ToastContainer,toast } from "react-toastify";
 import "./DprFetchViewer.css";
 
+const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
+
 const DprFetchViewer = () => {
   const navigate = useNavigate();
-  const API_URI = import.meta.env.VITE_API_URI;
-  const PORT = import.meta.env.VITE_BACKEND_PORT;
 
   const { projectId, dprId } = useParams();
   const [projectData, setProjectData] = useState(null);
@@ -22,8 +22,7 @@ const DprFetchViewer = () => {
     const pid = projectId;
 
     try {
-      const response = await fetch(
-        `http://${API_URI}:${PORT}/project/getProject/${pid}`,
+      const response = await fetch(`${API_BASE}/project/getProject/${pid}`,
         {
           credentials: "include",
         }
@@ -60,9 +59,51 @@ const DprFetchViewer = () => {
 
   const fetchandUpdateDprdata = async () => {
     //#region Helper Functions
-    const renderTable = (tableId, tasks = [], quantities = []) => {
+    const renderTable = (tableId, prog = {}) => {
       const table = document.getElementById(tableId);
       if (!table) return;
+
+      // New-style DPR shape: { items: [], unit: [], qty: [], remarks: [] }
+      if (
+        Array.isArray(prog.items) ||
+        Array.isArray(prog.unit) ||
+        Array.isArray(prog.qty) ||
+        Array.isArray(prog.remarks)
+      ) {
+        const items = Array.isArray(prog.items) ? prog.items : [];
+        const units = Array.isArray(prog.unit) ? prog.unit : [];
+        const qtys = Array.isArray(prog.qty) ? prog.qty : [];
+        const remarks = Array.isArray(prog.remarks) ? prog.remarks : [];
+        const len = Math.max(items.length, units.length, qtys.length, remarks.length);
+
+        table.innerHTML = Array.from({ length: Math.max(1, len) })
+          .map((_, i) => {
+            const it = items[i] ?? "--";
+            const rm = remarks[i] ?? "--";
+            const un = units[i] ?? "--";
+            const qt = qtys[i] ?? "--";
+            return `
+              <tr class=" bg-gray-700 rounded">
+                <td class=" py-2 pl-4 text-left w-[35%]">${it || "--"}</td>
+                <td class=" py-2 pl-4 text-left w-[35%]">${rm || "--"}</td>
+                <td class="text-center w-[17%]">${un}</td>
+                <td class="text-center w-[13%]">${qt}</td>
+              </tr>
+            `;
+          })
+          .join("");
+        return;
+      }
+
+      // Backwards-compatible: old style { progress: [], qty: [] } or { plan: [], qty: [] }
+      const tasks = Array.isArray(prog.progress) ? prog.progress : Array.isArray(prog.plan) ? prog.plan : [];
+      const quantities = Array.isArray(prog.qty) ? prog.qty : [];
+
+      if (!tasks || tasks.length === 0) {
+        table.innerHTML = "";
+        return;
+      }
+
       table.innerHTML =
         tasks
           ?.map(
@@ -82,7 +123,15 @@ const DprFetchViewer = () => {
 
       const arr = Array.isArray(items) ? items : [items];
       container.innerHTML = arr
-        .map((item) => `<div class="remarks-item">${item || "--"}</div>`)
+        .map((item) => {
+          if (typeof item === "string") {
+            return `<div class="remarks-item">${item}</div>`;
+          }
+          if (typeof item === "object" && item !== null) {
+            return `<div class="remarks-item">${item.text || "--"}</div>`;
+          }
+          return `<div class="remarks-item">--</div>`;
+        })
         .join("");
     };
 
@@ -227,8 +276,7 @@ const DprFetchViewer = () => {
     //#endregion
 
     try {
-      const response = await fetch(
-        `http://${API_URI}:${PORT}/report/getDPR/${dprId}`,
+      const response = await fetch(`${API_BASE}/report/getDPR/${dprId}`,
         { credentials: "include" }
       );
       const { data } = await response.json();
@@ -272,23 +320,37 @@ const DprFetchViewer = () => {
         yesterdayCumulative.toLocaleString();
 
       // TODAY / TOMORROW TABLES
-      renderTable(
-        "today-table",
-        data.today_prog?.progress,
-        data.today_prog?.qty
-      );
-      renderTable(
-        "tomorrow-table",
-        data.tomorrow_plan?.plan,
-        data.tomorrow_plan?.qty
-      );
+      renderTable("today-table", data.today_prog || {});
+      renderTable("tomorrow-table", data.tomorrow_plan || {});
 
       // EVENTS & REMARKS
-      renderList("events-container", data.events_remarks);
-      renderList(
-        "remarks-content-container",
-        data.report_footer?.bottom_remarks
-      );
+      renderList("events-container", data.report_footer?.events_visit);
+      const remarksContainer = document.getElementById("remarks-content-container");
+      if (remarksContainer) {
+        const bottom = data.report_footer?.bottom_remarks;
+        remarksContainer.innerHTML = "";
+
+        const pushLine = (line) => {
+          const div = document.createElement("div");
+          div.className = "remarks-item";
+          div.textContent = line || "";
+          remarksContainer.appendChild(div);
+        };
+
+        if (Array.isArray(bottom)) {
+          bottom.forEach((item) => {
+            if (typeof item === "string") {
+              item.split("\n").forEach((ln) => pushLine(ln.trim()));
+            } else if (item && typeof item === "object") {
+              (item.text || "").split("\n").forEach((ln) => pushLine(ln.trim()));
+            }
+          });
+        } else if (typeof bottom === "string") {
+          bottom.split("\n").forEach((ln) => pushLine(ln.trim()));
+        } else {
+          pushLine("--");
+        }
+      }
 
       // FOOTER DETAILS
       document.getElementById("prepared-by").textContent =
@@ -354,8 +416,7 @@ const DprFetchViewer = () => {
     try {
       setSubmitting(true);
 
-      const response = await fetch(
-        `http://${API_URI}:${PORT}/report/submit/${dprId}`,
+      const response = await fetch(`${API_BASE}/report/submit/${dprId}`,
         {
           credentials: "include",
         }
@@ -513,8 +574,10 @@ const DprFetchViewer = () => {
             <table className="w-full text-sm border-separate border-spacing-y-2">
               <thead className="text-gray-300 border-b border-gray-600">
                 <tr>
-                  <th className="py-2 pl-4 text-left text-[16px]">Task</th>
-                  <th className="text-center text-[16px]">Quantity</th>
+                  <th className="py-2 pl-4 text-left text-[16px] w-[35%]">Item</th>
+                  <th className="py-2 pl-4 text-left text-[16px] w-[35%]">Remarks</th>
+                  <th className="text-center text-[16px] w-[17%]">Unit</th>
+                  <th className="text-center text-[16px] w-[13%]">Qty</th>
                 </tr>
               </thead>
               <tbody className="text-white" id="today-table">
@@ -533,8 +596,10 @@ const DprFetchViewer = () => {
             <table className="w-full text-sm border-separate border-spacing-y-2">
               <thead className="text-gray-300 border-b border-gray-600">
                 <tr>
-                  <th className="py-2 pl-4 text-left ">Task</th>
-                  <th className="text-center text-[16px]">Quantity</th>
+                  <th className="py-2 pl-4 text-left text-[16px] w-[35%]">Item</th>
+                  <th className="py-2 pl-4 text-left text-[16px] w-[35%]">Remarks</th>
+                  <th className="text-center text-[16px] w-[17%]">Unit</th>
+                  <th className="text-center text-[16px] w-[13%]">Qty</th>
                 </tr>
               </thead>
               <tbody className="text-white" id="tomorrow-table">
@@ -547,7 +612,7 @@ const DprFetchViewer = () => {
         {/* Remarks Section */}
         <div className="grid md:grid-cols-3 gap-4">
           <div className="md:col-span-2 bg-gray-800 rounded-xl p-4">
-            <h2 className="text-lg font-semibold mb-2">Events & Remarks</h2>
+            <h2 className="text-lg font-semibold mb-2">Events & Visits</h2>
             <div
               className="space-y-2 text-l text-gray-300"
               id="events-container"

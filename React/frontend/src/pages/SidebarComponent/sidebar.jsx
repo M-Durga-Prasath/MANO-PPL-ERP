@@ -44,17 +44,23 @@ function Sidebar({ onCategoryChange }) {
     3: "developer",
     4: "ceo",
     5: "engineer",
-    6: "new_user"
+    6: "new_user",
   };
 
   const menuItems = [
-    { icon: "home", path: "/dashboard/home", id: "home", label: "Home", roles: [1, 2, 6] },
+    {
+      icon: "home",
+      path: "/dashboard/home",
+      id: "home",
+      label: "Home",
+      roles: [1, 2, 6, 5],
+    },
     {
       icon: "folder",
       path: "/dashboard/projects",
       id: "projects",
       label: "Projects",
-      roles: [1, 2],
+      roles: [1, 2, 5],
     },
     { icon: "bar_chart", id: "reports", label: "Reports", roles: [1, 2] },
     {
@@ -73,6 +79,13 @@ function Sidebar({ onCategoryChange }) {
       path: "/dashboard/work-in-progress",
       id: "work",
       label: "Work In Progress",
+      roles: [2, 5],
+    },
+    {
+      icon: "admin_panel_settings",
+      path: "/dashboard/admin",
+      id: "admin",
+      label: "Admin",
       roles: [2],
     },
     // { icon: "summarize", id: "summary", label: "Summary", roles: [2] },
@@ -81,7 +94,9 @@ function Sidebar({ onCategoryChange }) {
   // Filter menu items based on titleId
   let filteredMenuItems = [];
   if (titleId) {
-    filteredMenuItems = menuItems.filter((item) => item.roles.includes(titleId));
+    filteredMenuItems = menuItems.filter((item) =>
+      item.roles.includes(titleId)
+    );
   }
 
   return (
@@ -90,7 +105,7 @@ function Sidebar({ onCategoryChange }) {
         alt="Company logo"
         className="w-7 h-12 mb-6 hover:cursor-pointer"
         src="/mano.svg"
-        />
+      />
 
       <nav className="flex flex-col space-y-8">
         {filteredMenuItems.map(({ icon, path, id, children, label }, idx) => (

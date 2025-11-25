@@ -1,9 +1,8 @@
 import React, {useState, useEffect} from 'react'
 
-const API_URI = import.meta.env.VITE_API_URI;
-const PORT = import.meta.env.VITE_BACKEND_PORT;
+const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
 
-function VendorFilter({ onClose }) {
+function VendorFilter({ onClose, onApplyFilters }) {
   const [jobNatures, setJobNatures] = useState([]);
   const [locations, setLocations] = useState([]);
   const [jobNatureMap, setJobNatureMap] = useState({});
@@ -13,7 +12,7 @@ function VendorFilter({ onClose }) {
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const response = await fetch(`http://${API_URI}:${PORT}/vendor_api/metadata/`, {
+        const response = await fetch(`${API_BASE}/vendor_api/metadata/`, {
           credentials: 'include',
           });
         if (!response.ok) throw new Error("Network response was not ok");
@@ -23,7 +22,7 @@ function VendorFilter({ onClose }) {
         setJobNatureMap(data.jobNatures || {});
         setLocationMap(data.locations || {});
       } catch (error) {
-        console.error("Error fetching metadata:", error);
+        console.error("Error fetching metadata:", error); 
       }
     };
     fetchMetadata();
@@ -133,10 +132,27 @@ function VendorFilter({ onClose }) {
           </div>
         </div>
         <div className="mt-8 flex justify-end space-x-4">
-          <button className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition duration-300">
+          <button
+            className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition duration-300"
+            onClick={() => {
+              setSelectedJobNatures([]);
+              setSelectedLocations([]);
+            }}
+          >
             Clear Filters
           </button>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition duration-300">
+          <button
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition duration-300"
+            onClick={() => {
+              const appliedJobNatureIds = selectedJobNatures.map(nature => jobNatureMap[nature]);
+              const appliedLocationIds = selectedLocations.map(loc => locationMap[loc]);
+              onApplyFilters({
+                jobNatureIds: appliedJobNatureIds,
+                locationIds: appliedLocationIds
+              });
+              onClose();
+            }}
+          >
             Apply Filters
           </button>
         </div>

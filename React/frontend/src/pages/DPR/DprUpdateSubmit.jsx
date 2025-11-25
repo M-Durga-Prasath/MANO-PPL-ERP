@@ -2,14 +2,21 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 
-const API_URI = import.meta.env.VITE_API_URI;
-const PORT = import.meta.env.VITE_BACKEND_PORT;
+const API_BASE = import.meta.env.VITE_API_BASE ?? '/api';
 
 function DprUpdateSubmit() {
   const { projectId, dprId } = useParams();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); 
+  const UNIT_OPTIONS = ["No","Rmt","Sqm","Cum","Rft","Sft","Cft","MT","Kg","Lit","Day","Each","LS","Shift","Month","Hrs"];
+  const genId = () => `${Date.now().toString(36)}-${Math.floor(Math.random()*100000).toString(36)}`;
 
   const [project, setProject] = useState(null);
+  const [eventsVisit, setEventsVisit] = useState([{ id: genId(), text: "" }]);
+  const [generalRemark, setGeneralRemark] = useState("");
+
+const addEventVisit = () => setEventsVisit(p => [...p, { id: genId(), text: '' }]);
+const removeEventVisit = idx => setEventsVisit(p => p.filter((_, i) => i !== idx));
+const setEventVisit = (idx, val) => setEventsVisit(p => p.map((row, i) => i === idx ? { ...row, text: val } : row));
 
   const [reportDate, setReportDate] = useState(""); // read-only later
   const [siteCondition, setSiteCondition] = useState({
@@ -23,19 +30,19 @@ function DprUpdateSubmit() {
   });
 
   const [todayProg, setTodayProg] = useState([
-    { id: crypto.randomUUID(), left: "", right: "" },
+    { id: genId(), item: "", unit: "", qty: "", remarks: "" },
   ]);
   const [tomorrowPlan, setTomorrowPlan] = useState([
-    { id: crypto.randomUUID(), left: "", right: "" },
+    { id: genId(), item: "", unit: "", qty: "", remarks: "" },
   ]);
   const [eventsRemarks, setEventsRemarks] = useState([
-    { id: crypto.randomUUID(), text: "" },
+    { id: genId(), text: "" },
   ]);
   const [bottomRemarks, setBottomRemarks] = useState([
-    { id: crypto.randomUUID(), text: "" },
+    { id: genId(), text: "" },
   ]);
   const [distribute, setDistribute] = useState([
-    { id: crypto.randomUUID(), text: "" },
+    { id: genId(), text: "" },
   ]);
 
   const [preparedBy, setPreparedBy] = useState("");
@@ -96,8 +103,7 @@ function DprUpdateSubmit() {
     let mounted = true;
 
     async function fetchProject() {
-      const res = await fetch(
-        `http://${API_URI}:${PORT}/project/getProject/${projectId}`,
+      const res = await fetch(`${API_BASE}/project/getProject/${projectId}`,
         { credentials: "include" }
       );
       const { data } = await res.json();
@@ -106,8 +112,7 @@ function DprUpdateSubmit() {
     }
 
     async function fetchDpr() {
-      const res = await fetch(
-        `http://${API_URI}:${PORT}/report/getDPR/${dprId}`,
+      const res = await fetch(`${API_BASE}/report/getDPR/${dprId}`,
         { credentials: "include" }
       );
       const { data } = await res.json();
@@ -138,51 +143,73 @@ function DprUpdateSubmit() {
       setLabourReport(safe);
 
       // ---- Today Progress ----
-      setTodayProg(
-        Array.isArray(data?.today_prog?.progress)
-          ? data.today_prog.progress.map((left, i) => ({
-              id: crypto.randomUUID(),
-              left,
-              right: data.today_prog.qty?.[i] ?? "",
-            }))
-          : [{ id: crypto.randomUUID(), left: "", right: "" }]
+      // Support both old and new shapes
+      if (data?.today_prog) {
+        const tp = data.today_prog;
+        const items = Array.isArray(tp.items) ? tp.items : Array.isArray(tp.progress) ? tp.progress : [];
+        const qty = Array.isArray(tp.qty) ? tp.qty : [];
+        const unit = Array.isArray(tp.unit) ? tp.unit : [];
+        const remarks = Array.isArray(tp.remarks) ? tp.remarks : [];
+        const len = Math.max(items.length, qty.length, unit.length, remarks.length, 1);
+        const arr = [];
+        for (let i = 0; i < len; i++) {
+          arr.push({
+            id: genId(),
+            item: items[i] ?? "",
+            unit: unit[i] ?? "",
+            qty: qty[i] ?? "",
+            remarks: remarks[i] ?? "",
+          });
+        }
+        setTodayProg(arr);
+      } else {
+        setTodayProg([{ id: genId(), item: "", unit: "", qty: "", remarks: "" }]);
+      }
+
+      // ---- Tomorrow Plan ----
+      if (data?.tomorrow_plan) {
+        const tp2 = data.tomorrow_plan;
+        const items2 = Array.isArray(tp2.items) ? tp2.items : Array.isArray(tp2.plan) ? tp2.plan : [];
+        const qty2 = Array.isArray(tp2.qty) ? tp2.qty : [];
+        const unit2 = Array.isArray(tp2.unit) ? tp2.unit : [];
+        const remarks2 = Array.isArray(tp2.remarks) ? tp2.remarks : [];
+        const len2 = Math.max(items2.length, qty2.length, unit2.length, remarks2.length, 1);
+        const arr2 = [];
+        for (let i = 0; i < len2; i++) {
+          arr2.push({
+            id: genId(),
+            item: items2[i] ?? "",
+            unit: unit2[i] ?? "",
+            qty: qty2[i] ?? "",
+            remarks: remarks2[i] ?? "",
+          });
+        }
+        setTomorrowPlan(arr2);
+      } else {
+        setTomorrowPlan([{ id: genId(), item: "", unit: "", qty: "", remarks: "" }]);
+      }
+
+      // Events Visit
+      setEventsVisit(
+        Array.isArray(data?.report_footer?.events_visit)
+          ? data.report_footer.events_visit.map((text) => ({ id: genId(), text }))
+          : [{ id: genId(), text: "" }]
       );
 
-      setTomorrowPlan(
-        Array.isArray(data?.tomorrow_plan?.plan)
-          ? data.tomorrow_plan.plan.map((left, i) => ({
-              id: crypto.randomUUID(),
-              left,
-              right: data.tomorrow_plan.qty?.[i] ?? "",
-            }))
-          : [{ id: crypto.randomUUID(), left: "", right: "" }]
-      );
-
-      setEventsRemarks(
-        Array.isArray(data?.events_remarks)
-          ? data.events_remarks.map((text) => ({
-              id: crypto.randomUUID(),
-              text,
-            }))
-          : [{ id: crypto.randomUUID(), text: "" }]
-      );
-
-      setBottomRemarks(
+      // General / bottom remarks (textarea)
+      setGeneralRemark(
         Array.isArray(data?.report_footer?.bottom_remarks)
-          ? data.report_footer.bottom_remarks.map((text) => ({
-              id: crypto.randomUUID(),
-              text,
-            }))
-          : [{ id: crypto.randomUUID(), text: "" }]
+          ? data.report_footer.bottom_remarks.join("\n")
+          : typeof data?.report_footer?.bottom_remarks === "string"
+          ? data.report_footer.bottom_remarks
+          : ""
       );
 
+      // Distribute
       setDistribute(
         Array.isArray(data?.report_footer?.distribute)
-          ? data.report_footer.distribute.map((text) => ({
-              id: crypto.randomUUID(),
-              text,
-            }))
-          : [{ id: crypto.randomUUID(), text: "" }]
+          ? data.report_footer.distribute.map((text) => ({ id: genId(), text }))
+          : [{ id: genId(), text: "" }]
       );
 
       setPreparedBy(data?.report_footer?.prepared_by || "");
@@ -251,7 +278,7 @@ function DprUpdateSubmit() {
       rain_timing: Array.isArray(dpr?.site_condition?.rain_timing)
         ? dpr.site_condition.rain_timing
         : [],
-    },
+    }, 
 
     // labour_report is ALWAYS an object
     labour_report: (() => {
@@ -269,16 +296,24 @@ function DprUpdateSubmit() {
     })(),
 
     today_prog: {
-      progress: Array.isArray(dpr?.today_prog?.progress)
+      items: Array.isArray(dpr?.today_prog?.items)
+        ? dpr.today_prog.items
+        : Array.isArray(dpr?.today_prog?.progress)
         ? dpr.today_prog.progress
         : [],
+      unit: Array.isArray(dpr?.today_prog?.unit) ? dpr.today_prog.unit : [],
       qty: Array.isArray(dpr?.today_prog?.qty) ? dpr.today_prog.qty : [],
+      remarks: Array.isArray(dpr?.today_prog?.remarks) ? dpr.today_prog.remarks : [],
     },
     tomorrow_plan: {
-      plan: Array.isArray(dpr?.tomorrow_plan?.plan)
+      items: Array.isArray(dpr?.tomorrow_plan?.items)
+        ? dpr.tomorrow_plan.items
+        : Array.isArray(dpr?.tomorrow_plan?.plan)
         ? dpr.tomorrow_plan.plan
         : [],
+      unit: Array.isArray(dpr?.tomorrow_plan?.unit) ? dpr.tomorrow_plan.unit : [],
       qty: Array.isArray(dpr?.tomorrow_plan?.qty) ? dpr.tomorrow_plan.qty : [],
+      remarks: Array.isArray(dpr?.tomorrow_plan?.remarks) ? dpr.tomorrow_plan.remarks : [],
     },
     events_remarks: Array.isArray(dpr?.events_remarks)
       ? dpr.events_remarks
@@ -293,6 +328,8 @@ function DprUpdateSubmit() {
         : [],
       bottom_remarks: Array.isArray(dpr?.report_footer?.bottom_remarks)
         ? dpr.report_footer.bottom_remarks
+        : typeof dpr?.report_footer?.bottom_remarks === "string"
+        ? [dpr.report_footer.bottom_remarks]
         : [],
     },
   });
@@ -323,6 +360,15 @@ function DprUpdateSubmit() {
     try {
       setSaving(true);
 
+      const bottomRemarksArray = (() => {
+        if (!generalRemark) return [""];
+        const arr = generalRemark
+          .split("\n")
+          .map((s) => s.replace(/\r/g, "").trim());
+        const filtered = arr.filter((s) => s.length > 0);
+        return filtered.length ? filtered : [""];
+      })();
+
       const currentDpr = {
         report_date: reportDate,
         site_condition: {
@@ -332,19 +378,23 @@ function DprUpdateSubmit() {
         },
         labour_report: labourReport,
         today_prog: {
-          progress: todayProg.map((row) => row.left),
-          qty: todayProg.map((row) => row.right),
+          items: todayProg.map((row) => row.item || ""),
+          unit: todayProg.map((row) => row.unit || ""),
+          qty: todayProg.map((row) => row.qty || ""),
+          remarks: todayProg.map((row) => row.remarks || ""),
         },
         tomorrow_plan: {
-          plan: tomorrowPlan.map((row) => row.left),
-          qty: tomorrowPlan.map((row) => row.right),
+          items: tomorrowPlan.map((row) => row.item || ""),
+          unit: tomorrowPlan.map((row) => row.unit || ""),
+          qty: tomorrowPlan.map((row) => row.qty || ""),
+          remarks: tomorrowPlan.map((row) => row.remarks || ""),
         },
         events_remarks: eventsRemarks.map((e) => e.text),
         report_footer: {
           distribute: distribute.map((d) => d.text),
           prepared_by: preparedBy,
-          bottom_remarks: bottomRemarks.map((b) => b.text),
-          events_visit: [],
+          bottom_remarks: bottomRemarksArray,
+          events_visit: eventsVisit.map((e) => e.text),  
         },
       };
 
@@ -365,8 +415,7 @@ function DprUpdateSubmit() {
 
       console.log("FINAL PATCH SENT:", JSON.stringify(patch, null, 2));
 
-      const res = await fetch(
-        `http://${API_URI}:${PORT}/report/updateDPR/${dprId}`,
+      const res = await fetch(`${API_BASE}/report/updateDPR/${dprId}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -423,13 +472,13 @@ function DprUpdateSubmit() {
           </thead>
           <tbody className="text-white">
             {rows.length ? (
-              rows.map((r) => (
-                <tr key={r.id}>
+              rows.map((r, idx) => (
+                <tr key={`row-${idx}`}>
                   <td className="pl-2 py-2">
                     <input
                       type="text"
                       value={r.left}
-                      onChange={(e) => onChangeLeft(r.id, e.target.value)}
+                      onChange={(e) => onChangeLeft(idx, e.target.value)}
                       className="w-full bg-transparent border-b border-gray-600 outline-none"
                       placeholder={leftPlaceholder}
                     />
@@ -438,7 +487,7 @@ function DprUpdateSubmit() {
                     <input
                       type="text"
                       value={r.right}
-                      onChange={(e) => onChangeRight(r.id, e.target.value)}
+                      onChange={(e) => onChangeRight(idx, e.target.value)}
                       className="w-full bg-transparent border-b border-gray-600 outline-none text-right"
                       placeholder={rightPlaceholder}
                     />
@@ -446,7 +495,7 @@ function DprUpdateSubmit() {
                   <td className="py-2 text-right">
                     <button
                       type="button"
-                      onClick={() => onRemove(r.id)}
+                      onClick={() => onRemove(idx)}
                       className="text-red-400 hover:text-red-500 hover:cursor-pointer"
                       title="Delete row"
                     >
@@ -494,18 +543,18 @@ function DprUpdateSubmit() {
         </div>
         <div className="flex flex-col gap-3">
           {items.length ? (
-            items.map((r) => (
+            items.map((r, idx) => (
               <div key={r.id} className="flex items-center gap-2">
                 <input
                   type="text"
-                  value={r.text}
-                  onChange={(e) => onChange(r.id, e.target.value)}
+                  defaultValue={r.text}
+                  onBlur={(e) => onChange(idx, e.target.value)}
                   className="flex-1 bg-transparent border-b border-gray-600 outline-none"
                   placeholder={placeholder}
                 />
                 <button
                   type="button"
-                  onClick={() => onRemove(r.id)}
+                  onClick={() => onRemove(idx)}
                   className="text-red-400 hover:text-red-500 text-sm"
                 >
                   <span className="material-icons text-md">delete</span>
@@ -521,80 +570,23 @@ function DprUpdateSubmit() {
     );
   }
 
-  // ---- Today handlers ----
+  // ---- Today handlers (4-col) ----
   const addTodayRow = () =>
-    setTodayProg((p) => [
-      ...p,
-      { id: crypto.randomUUID(), left: "", right: "" },
-    ]);
+    setTodayProg((p) => [...p, { id: genId(), item: "", unit: "", qty: "", remarks: "" }]);
 
-  const removeTodayRow = (id) =>
-    setTodayProg((p) => p.filter((row) => row.id !== id));
+  const removeTodayRow = (idx) =>
+    setTodayProg((p) => p.filter((_, i) => i !== idx));
 
-  const setTodayProgress = (id, val) =>
-    setTodayProg((p) =>
-      p.map((row) => (row.id === id ? { ...row, left: val } : row))
-    );
-
-  const setTodayQty = (id, val) =>
-    setTodayProg((p) =>
-      p.map((row) => (row.id === id ? { ...row, right: val } : row))
-    );
-
-  // ---- Tomorrow handlers ----
+  // ---- Tomorrow handlers (4-col) ----
   const addTomorrowRow = () =>
-    setTomorrowPlan((p) => [
-      ...p,
-      { id: crypto.randomUUID(), left: "", right: "" },
-    ]);
+    setTomorrowPlan((p) => [...p, { id: genId(), item: "", unit: "", qty: "", remarks: "" }]);
 
-  const removeTomorrowRow = (id) =>
-    setTomorrowPlan((p) => p.filter((row) => row.id !== id));
+  const removeTomorrowRow = (idx) =>
+    setTomorrowPlan((p) => p.filter((_, i) => i !== idx));
 
-  const setTomorrowPlanText = (id, val) =>
-    setTomorrowPlan((p) =>
-      p.map((row) => (row.id === id ? { ...row, left: val } : row))
-    );
-
-  const setTomorrowQty = (id, val) =>
-    setTomorrowPlan((p) =>
-      p.map((row) => (row.id === id ? { ...row, right: val } : row))
-    );
-
-  // ---- Events & Remarks handlers ---- (unchanged)
-  const addEvent = () =>
-    setEventsRemarks((p) => [...p, { id: crypto.randomUUID(), text: "" }]);
-
-  const removeEvent = (id) =>
-    setEventsRemarks((p) => p.filter((row) => row.id !== id));
-
-  const setEvent = (id, val) =>
-    setEventsRemarks((p) =>
-      p.map((row) => (row.id === id ? { ...row, text: val } : row))
-    );
-
-  const addBottomRemark = () =>
-    setBottomRemarks((p) => [...p, { id: crypto.randomUUID(), text: "" }]);
-
-  const removeBottomRemark = (id) =>
-    setBottomRemarks((p) => p.filter((row) => row.id !== id));
-
-  const setBottomRemark = (id, val) =>
-    setBottomRemarks((p) =>
-      p.map((row) => (row.id === id ? { ...row, text: val } : row))
-    );
-
-  // ---- Distribute handlers ---- (unchanged)
-  const addDistributor = () =>
-    setDistribute((p) => [...p, { id: crypto.randomUUID(), text: "" }]);
-
-  const removeDistributor = (id) =>
-    setDistribute((p) => p.filter((row) => row.id !== id));
-
-  const setDistributor = (id, val) =>
-    setDistribute((p) =>
-      p.map((row) => (row.id === id ? { ...row, text: val } : row))
-    );
+  const addDistributor = () => setDistribute(p => [...p, { id: genId(), text: '' }]);
+  const removeDistributor = idx => setDistribute(p => p.filter((_, i) => i !== idx));
+  const setDistributor = (idx, val) => setDistribute(p => p.map((row, i) => i === idx ? { ...row, text: val } : row));
 
   //#endregion
 
@@ -617,7 +609,7 @@ function DprUpdateSubmit() {
     try {
       setSubmitting(true);
 
-      const response = await fetch(`http://${API_URI}:${PORT}/report/submit/${dprId}`, {
+      const response = await fetch(`${API_BASE}/report/submit/${dprId}`, {
         credentials:"include"
       });
 
@@ -818,7 +810,7 @@ function DprUpdateSubmit() {
         </div>
       </div>
 
-      {/* Labour Report */}
+      {/* Labour Report - new design with arrow key navigation */}
       <div className="bg-gray-800/60 p-6 rounded-xl mb-10 shadow-lg border border-gray-700">
         <h2 className="text-2xl font-semibold mb-4 text-blue-400">
           Labour Report
@@ -828,42 +820,85 @@ function DprUpdateSubmit() {
             <thead>
               <tr className="bg-gray-700/60 text-gray-300 uppercase text-xs tracking-wider">
                 <th className="px-3 py-2 text-left">Agency</th>
-                {labourCols.map((c) => (
-                  <th key={c} className="px-3 py-2 text-center">
-                    {c}
-                  </th>
+                {project?.metadata?.labour_type?.map((type, colIdx) => (
+                  <th key={type} className="px-3 py-2 text-center">{type}</th>
                 ))}
                 <th className="px-3 py-2 text-center">Total</th>
                 <th className="px-3 py-2 text-left">Remarks</th>
               </tr>
             </thead>
             <tbody>
-              {labourReport.agency.map((a, i) => (
+              {project?.metadata?.agency?.map((agency, rowIdx) => (
                 <tr
-                  key={`${a}-${i}`}
+                  key={`${agency}-${rowIdx}`}
                   className="even:bg-gray-700/40 hover:bg-gray-700/60 transition"
                 >
-                  <td className="px-3 py-2 font-medium">{a}</td>
-                  {labourCols.map((c) => (
-                    <td key={c} className="px-3 py-2 text-center">
+                  <td className="px-3 py-2 font-medium">{agency}</td>
+                  {project?.metadata?.labour_type?.map((type, colIdx) => (
+                    <td key={type} className="px-3 py-2 text-center">
                       <input
                         type="text"
-                        inputMode="number"
+                        inputMode="numeric"
                         pattern="[0-9]*"
-                        value={labourReport[c]?.[i] ?? ""}
-                        onChange={(e) => setCell(c, i, e.target.value)}
+                        value={
+                          (labourReport[type] &&
+                            labourReport[type][rowIdx] !== undefined)
+                            ? labourReport[type][rowIdx]
+                            : ""
+                        }
+                        onChange={e => {
+                          setLabourReport(prev => {
+                            const next = { ...prev, [type]: [...(prev[type] || [])] };
+                            const n = Number(e.target.value);
+                            next[type][rowIdx] = Number.isFinite(n) && n >= 0 ? n : 0;
+                            return next;
+                          });
+                        }}
                         className="w-20 text-center bg-gray-900/50 border border-gray-600 rounded px-2 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                        data-labour-row={rowIdx}
+                        data-labour-col={colIdx}
+                        onKeyDown={e => {
+                          const totalRows = project?.metadata?.agency?.length ?? 0;
+                          const totalCols = project?.metadata?.labour_type?.length ?? 0;
+                          let nextRow = rowIdx, nextCol = colIdx;
+                          if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+                            if (e.key === "ArrowUp") nextRow = Math.max(0, rowIdx - 1);
+                            if (e.key === "ArrowDown") nextRow = Math.min(totalRows - 1, rowIdx + 1);
+                            if (e.key === "ArrowLeft") nextCol = Math.max(0, colIdx - 1);
+                            if (e.key === "ArrowRight") nextCol = Math.min(totalCols - 1, colIdx + 1);
+                            // Only move if not same as current
+                            if (nextRow !== rowIdx || nextCol !== colIdx) {
+                              e.preventDefault();
+                              const sel = document.querySelector(
+                                `input[data-labour-row="${nextRow}"][data-labour-col="${nextCol}"]`
+                              );
+                              if (sel) sel.focus();
+                            }
+                          }
+                        }}
                       />
                     </td>
                   ))}
                   <td className="px-3 py-2 text-center font-semibold">
-                    {rowTotal(i)}
+                    {
+                      project?.metadata?.labour_type?.reduce(
+                        (sum, type) =>
+                          sum + (Number(labourReport[type]?.[rowIdx]) || 0),
+                        0
+                      )
+                    }
                   </td>
                   <td className="px-3 py-2">
                     <input
                       type="text"
-                      value={labourReport.remarks?.[i] || ""}
-                      onChange={(e) => setRemark(i, e.target.value)}
+                      value={labourReport.remarks?.[rowIdx] || ""}
+                      onChange={e => {
+                        setLabourReport(prev => {
+                          const next = { ...prev, remarks: [...(prev.remarks || [])] };
+                          next.remarks[rowIdx] = e.target.value;
+                          return next;
+                        });
+                      }}
                       className="w-full bg-gray-900/50 border border-gray-600 rounded px-2 py-1 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                     />
                   </td>
@@ -871,13 +906,28 @@ function DprUpdateSubmit() {
               ))}
               <tr className="bg-gray-900/70 font-semibold">
                 <td className="px-3 py-2">Total</td>
-                {labourCols.map((c) => (
-                  <td key={c} className="px-3 py-2 text-center">
-                    {colTotals[c] || 0}
+                {project?.metadata?.labour_type?.map((type, colIdx) => (
+                  <td key={type} className="px-3 py-2 text-center">
+                    {
+                      (labourReport[type] || []).reduce(
+                        (s, v) => s + (Number(v) || 0),
+                        0
+                      )
+                    }
                   </td>
                 ))}
                 <td className="px-3 py-2 text-center text-blue-400 font-bold">
-                  {colTotals.total || 0}
+                  {
+                    project?.metadata?.labour_type?.reduce(
+                      (total, type) =>
+                        total +
+                        (labourReport[type] || []).reduce(
+                          (s, v) => s + (Number(v) || 0),
+                          0
+                        ),
+                      0
+                    )
+                  }
                 </td>
                 <td></td>
               </tr>
@@ -887,98 +937,78 @@ function DprUpdateSubmit() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-6 mb-8">
-        <EditableTable
+        <EditableTable4
           title="Today's Progress"
           rows={todayProg}
-          leftPlaceholder="Task"
-          rightPlaceholder="Quantity"
           onAdd={() => addTodayRow()}
           onRemove={removeTodayRow}
-          onChangeLeft={setTodayProgress}
-          onChangeRight={setTodayQty}
+          onChangeItem={(i, v) => setTodayProg((p) => p.map((r, idx) => (idx === i ? { ...r, item: v } : r)))}
+          onChangeRemarks={(i, v) => setTodayProg((p) => p.map((r, idx) => (idx === i ? { ...r, remarks: v } : r)))}
+          onChangeUnit={(i, v) => setTodayProg((p) => p.map((r, idx) => (idx === i ? { ...r, unit: v } : r)))}
+          onChangeQty={(i, v) => setTodayProg((p) => p.map((r, idx) => (idx === i ? { ...r, qty: v } : r)))}
         />
-        <EditableTable
+        <EditableTable4
           title="Tomorrow's Planning"
           rows={tomorrowPlan}
-          leftPlaceholder="Task"
-          rightPlaceholder="Quantity"
-          onAdd={addTomorrowRow}
+          onAdd={() => addTomorrowRow()}
           onRemove={removeTomorrowRow}
-          onChangeLeft={setTomorrowPlanText}
-          onChangeRight={setTomorrowQty}
+          onChangeItem={(i, v) => setTomorrowPlan((p) => p.map((r, idx) => (idx === i ? { ...r, item: v } : r)))}
+          onChangeRemarks={(i, v) => setTomorrowPlan((p) => p.map((r, idx) => (idx === i ? { ...r, remarks: v } : r)))}
+          onChangeUnit={(i, v) => setTomorrowPlan((p) => p.map((r, idx) => (idx === i ? { ...r, unit: v } : r)))}
+          onChangeQty={(i, v) => setTomorrowPlan((p) => p.map((r, idx) => (idx === i ? { ...r, qty: v } : r)))}
         />
       </div>
 
+      {/* General Remarks section with new layout */}
       <div className="grid md:grid-cols-3 gap-6 mb-8">
         <EditableList
           className="md:col-span-2"
-          title="Events & Remarks"
-          items={eventsRemarks}
-          onAdd={addEvent}
-          onRemove={removeEvent}
-          onChange={setEvent}
+          title="Events & Visits"
+          items={eventsVisit}
+          onAdd={addEventVisit}
+          onRemove={removeEventVisit}
+          onChange={setEventVisit}
           placeholder="Enter event or remark"
         />
-        <EditableList
-          title="General Remarks"
-          items={bottomRemarks}
-          onAdd={addBottomRemark}
-          onRemove={removeBottomRemark}
-          onChange={setBottomRemark}
-          placeholder="Enter general remark"
-        >
-          <div className="mt-4 border-t border-gray-700 pt-4 grid grid-cols-1 gap-3">
+        {/* General Remarks - new layout */}
+        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 shadow-lg flex flex-col h-full">
+          <div className="grid grid-cols-2 gap-3">
+            {/* General Remarks textarea spanning two columns */}
+            <div className="col-span-2">
+              <h2 className="text-lg font-semibold mb-3">General Remarks</h2>
+              <textarea
+                rows={4}
+                value={generalRemark}
+                onChange={(e) => setGeneralRemark(e.target.value)}
+                className="w-full bg-transparent border border-gray-600 rounded px-3 py-2 outline-none resize-y text-gray-100"
+                placeholder="Enter general remarks"
+              />
+            </div>
+            {/* Prepared By and Distribute side by side */}
             <div>
-              <label className="block text-sm text-gray-300 mb-1">
-                Prepared By
-              </label>
+              <label className="block text-sm text-gray-300 mb-1 mt-4">Prepared By</label>
               <input
                 type="text"
                 value={preparedBy}
-                onChange={(e) => setPreparedBy(e.target.value)}
-                className="w-full bg-transparent border-b border-gray-600 outline-none"
+                onChange={e => setPreparedBy(e.target.value)}
+                className="w-full bg-transparent border-b border-gray-600 outline-none text-gray-100"
+                placeholder="Prepared By"
               />
             </div>
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm text-gray-300">
-                  Distribute
-                </label>
-                <button
-                  type="button"
-                  onClick={addDistributor}
-                  className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600"
-                >
-                  + Add
-                </button>
-              </div>
-              <div className="flex flex-col gap-2">
-                {distribute.map((d) => (
-                  <div key={d.id} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={d.text}
-                      onChange={(e) => setDistributor(d.id, e.target.value)}
-                      className="flex-1 bg-transparent border-b border-gray-600 outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeDistributor(d.id)}
-                      className="text-red-400 hover:text-red-500 text-sm"
-                    >
-                      <div className="material-icons"> delete </div>
-                    </button>
-                  </div>
-                ))}
-                {!distribute.length && (
-                  <div className="text-gray-500 text-sm">
-                    No recipients yet.
-                  </div>
-                )}
-              </div>
+              <label className="block text-sm text-gray-300 mb-1 mt-4">Distribute</label>
+              <EditableList
+                title=""
+                items={distribute}
+                onAdd={addDistributor}
+                onRemove={removeDistributor}
+                onChange={setDistributor}
+                placeholder="Add recipient"
+                className="p-0 border-0 shadow-none bg-transparent"
+              />
             </div>
           </div>
-        </EditableList>
+        </div>
       </div>
 
       {/* Actions */}
@@ -1020,3 +1050,104 @@ function DprUpdateSubmit() {
 }
 
 export default DprUpdateSubmit;
+
+  function EditableTable4({
+    title,
+    rows,
+    onAdd,
+    onRemove,
+    onChangeItem,
+    onChangeRemarks,
+    onChangeUnit,
+    onChangeQty,
+  }) {
+    const UNIT_OPTIONS_LOCAL = ["No","Rmt","Sqm","Cum","Rft","Sft","Cft","MT","Kg","Lit","Day","Each","LS","Shift","Month","Hrs"];
+    return (
+      <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 shadow-lg">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <button
+            type="button"
+            onClick={onAdd}
+            className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600"
+          >
+            + Add Row
+          </button>
+        </div>
+        <table className="w-full text-sm border-separate border-spacing-y-2">
+          <thead className="text-gray-300 border-b border-gray-600">
+            <tr>
+              <th className="py-2 pl-2 text-left w-[35%]">Item</th>
+              <th className="py-2 pl-2 text-left w-[35%]">Remarks</th>
+              <th className="py-2 pl-2 text-left w-[10%]">Unit</th>
+              <th className="py-2 pl-2 text-left w-[20%]">Qty</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody className="text-white">
+            {rows.length ? (
+              rows.map((r, idx) => (
+                <tr key={r.id}>
+                  <td className="px-3 py-2 w-[35%]">
+                    <input
+                      type="text"
+                      value={r.item}
+                      onChange={(e) => onChangeItem(idx, e.target.value)}
+                      className="w-full bg-transparent border-b border-gray-600 outline-none"
+                      placeholder="Item"
+                    />
+                  </td>
+                  <td className="px-3 py-2 w-[35%]">
+                    <input
+                      type="text"
+                      value={r.remarks}
+                      onChange={(e) => onChangeRemarks(idx, e.target.value)}
+                      className="w-full bg-transparent border-b border-gray-600 outline-none"
+                      placeholder="Remarks"
+                    />
+                  </td>
+                  <td className="px-3 py-2 w-[10%] text-left">
+                    <select
+                      value={r.unit}
+                      onChange={(e) => onChangeUnit(idx, e.target.value)}
+                      className="w-full text-left bg-transparent border-b border-gray-600 outline-none"
+                    >
+                      <option value="">Select</option>
+                      {UNIT_OPTIONS_LOCAL.map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-3 py-2 w-[20%] text-left">
+                    <input
+                      type="text"
+                      value={r.qty}
+                      onChange={(e) => onChangeQty(idx, e.target.value)}
+                      className="w-full bg-transparent border-b border-gray-600 outline-none text-left"
+                      placeholder="Qty"
+                    />
+                  </td>
+                  <td className="py-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() => onRemove(idx)}
+                      className="text-red-400 hover:text-red-500 hover:cursor-pointer"
+                      title="Delete row"
+                    >
+                      <span className="material-icons text-md">delete</span>
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td className="text-gray-500 italic py-4" colSpan={5}>
+                  No rows yet. Use “+ Add Row”.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
