@@ -4,7 +4,7 @@ import { Server as SocketIO } from 'socket.io';
 import express from 'express';
 import cors from 'cors';
 import LoginRoutes from './AuthAPI/LoginAPI.js';
-import SignupRoutes from './AuthAPI/VerifyEmailAPI.js';
+import SignupRoutes, { handleVerifySignup } from './AuthAPI/VerifyEmailAPI.js';
 import ForgotPasswordRoutes from './AuthAPI/ForgotPasswordAPI.js';
 
 import ProjectRoutes from './ProjectAPI/Projects.js';
@@ -14,6 +14,7 @@ import VendorRoutes from './VendorClientAPI/vendor.js';
 import TaskRoutes from './Tasks/task.js';
 import AttendanceRoutes from './Attendance/Attendance.js';
 import Admin from './Admin/Admin.js';
+
 import './config.js';
 import cookieParser from 'cookie-parser';
 
@@ -45,7 +46,10 @@ app.use(cors({
 app.use(express.json());
 app.use('/auth', LoginRoutes);
 app.use('/api', SignupRoutes);
+app.get('/verify-signup', handleVerifySignup);
+app.post('/verify-signup', handleVerifySignup);
 app.use('/api', ForgotPasswordRoutes);
+
 
 app.use('/project', ProjectRoutes);
 app.use("/report", ReportRoutes); 
